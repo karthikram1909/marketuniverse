@@ -1,0 +1,318 @@
+css
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body {
+  overflow-x: hidden;
+  width: 100%;
+  background-color: #000000 !important;
+  min-height: 100vh;
+}
+
+#root {
+  background-color: #000000 !important;
+  min-height: 100vh;
+}
+
+@layer utilities {
+  @keyframes scroll-left {
+    from {
+      transform: translateX(0);
+    }
+    to {
+      transform: translateX(-50%);
+    }
+  }
+
+  .animate-scroll-slow {
+    animation: scroll-left 40s linear infinite;
+  }
+
+  .animate-scroll-slow:hover {
+    animation-play-state: paused;
+  }
+
+  @keyframes led-border-glow {
+    0%, 100% {
+      box-shadow: 
+        0 0 15px var(--glow-color),
+        0 0 30px var(--glow-color),
+        inset 0 0 10px var(--glow-color);
+    }
+    50% {
+      box-shadow: 
+        0 0 25px var(--glow-color),
+        0 0 50px var(--glow-color),
+        inset 0 0 20px var(--glow-color);
+    }
+  }
+
+  @keyframes corner-pulse {
+    0%, 100% {
+      opacity: 0.6;
+    }
+    50% {
+      opacity: 1;
+    }
+  }
+
+  .led-glow-red {
+    --glow-color: rgba(239, 68, 68, 0.6);
+    --border-color: rgba(239, 68, 68, 1);
+    position: relative;
+    border: 2px solid var(--border-color) !important;
+    animation: led-border-glow 2s ease-in-out infinite;
+  }
+
+  .led-glow-red::before,
+  .led-glow-red::after {
+    content: '';
+    position: absolute;
+    width: 30px;
+    height: 30px;
+    border: 2px solid var(--border-color);
+    border-radius: inherit;
+    animation: corner-pulse 2s ease-in-out infinite;
+    pointer-events: none;
+    z-index: 10;
+  }
+
+  .led-glow-red::before {
+    top: -2px;
+    left: -2px;
+    border-right: none;
+    border-bottom: none;
+    box-shadow: -3px -3px 15px var(--glow-color);
+  }
+
+  .led-glow-red::after {
+    bottom: -2px;
+    right: -2px;
+    border-left: none;
+    border-top: none;
+    box-shadow: 3px 3px 15px var(--glow-color);
+  }
+
+  .led-glow-cyan {
+    --glow-color: rgba(34, 211, 238, 0.6);
+    --border-color: rgba(34, 211, 238, 1);
+    position: relative;
+    border: 2px solid var(--border-color) !important;
+    animation: led-border-glow 2s ease-in-out infinite;
+  }
+
+  .led-glow-cyan::before,
+  .led-glow-cyan::after {
+    content: '';
+    position: absolute;
+    width: 30px;
+    height: 30px;
+    border: 2px solid var(--border-color);
+    border-radius: inherit;
+    animation: corner-pulse 2s ease-in-out infinite;
+    pointer-events: none;
+    z-index: 10;
+  }
+
+  .led-glow-cyan::before {
+    top: -2px;
+    left: -2px;
+    border-right: none;
+    border-bottom: none;
+    box-shadow: -3px -3px 15px var(--glow-color);
+  }
+
+  .led-glow-cyan::after {
+    bottom: -2px;
+    right: -2px;
+    border-left: none;
+    border-top: none;
+    box-shadow: 3px 3px 15px var(--glow-color);
+  }
+
+  .led-glow-gold {
+    --glow-color: rgba(245, 201, 106, 0.6);
+    --border-color: rgba(245, 201, 106, 1);
+    position: relative;
+    border: 2px solid var(--border-color) !important;
+    animation: led-border-glow 2s ease-in-out infinite;
+  }
+
+  .led-glow-gold::before,
+  .led-glow-gold::after {
+    content: '';
+    position: absolute;
+    width: 30px;
+    height: 30px;
+    border: 2px solid var(--border-color);
+    border-radius: inherit;
+    animation: corner-pulse 2s ease-in-out infinite;
+    pointer-events: none;
+    z-index: 10;
+  }
+
+  .led-glow-gold::before {
+    top: -2px;
+    left: -2px;
+    border-right: none;
+    border-bottom: none;
+    box-shadow: -3px -3px 15px var(--glow-color);
+  }
+
+  .led-glow-gold::after {
+    bottom: -2px;
+    right: -2px;
+    border-left: none;
+    border-top: none;
+    box-shadow: 3px 3px 15px var(--glow-color);
+  }
+
+  .led-glow-purple {
+    --glow-color: rgba(168, 85, 247, 0.6);
+    --border-color: rgba(168, 85, 247, 1);
+    position: relative;
+    border: 2px solid var(--border-color) !important;
+    animation: led-border-glow 2s ease-in-out infinite;
+  }
+
+  .led-glow-purple::before,
+  .led-glow-purple::after {
+    content: '';
+    position: absolute;
+    width: 30px;
+    height: 30px;
+    border: 2px solid var(--border-color);
+    border-radius: inherit;
+    animation: corner-pulse 2s ease-in-out infinite;
+    pointer-events: none;
+    z-index: 10;
+  }
+
+  .led-glow-purple::before {
+    top: -2px;
+    left: -2px;
+    border-right: none;
+    border-bottom: none;
+    box-shadow: -3px -3px 15px var(--glow-color);
+  }
+
+  .led-glow-purple::after {
+    bottom: -2px;
+    right: -2px;
+    border-left: none;
+    border-top: none;
+    box-shadow: 3px 3px 15px var(--glow-color);
+  }
+
+  .led-glow-green {
+    --glow-color: rgba(34, 197, 94, 0.6);
+    --border-color: rgba(34, 197, 94, 1);
+    position: relative;
+    border: 2px solid var(--border-color) !important;
+    animation: led-border-glow 2s ease-in-out infinite;
+  }
+
+  .led-glow-green::before,
+  .led-glow-green::after {
+    content: '';
+    position: absolute;
+    width: 30px;
+    height: 30px;
+    border: 2px solid var(--border-color);
+    border-radius: inherit;
+    animation: corner-pulse 2s ease-in-out infinite;
+    pointer-events: none;
+    z-index: 10;
+  }
+
+  .led-glow-green::before {
+    top: -2px;
+    left: -2px;
+    border-right: none;
+    border-bottom: none;
+    box-shadow: -3px -3px 15px var(--glow-color);
+  }
+
+  .led-glow-green::after {
+    bottom: -2px;
+    right: -2px;
+    border-left: none;
+    border-top: none;
+    box-shadow: 3px 3px 15px var(--glow-color);
+  }
+
+  .led-glow-blue {
+    --glow-color: rgba(59, 130, 246, 0.6);
+    --border-color: rgba(59, 130, 246, 1);
+    position: relative;
+    border: 2px solid var(--border-color) !important;
+    animation: led-border-glow 2s ease-in-out infinite;
+  }
+
+  .led-glow-blue::before,
+  .led-glow-blue::after {
+    content: '';
+    position: absolute;
+    width: 30px;
+    height: 30px;
+    border: 2px solid var(--border-color);
+    border-radius: inherit;
+    animation: corner-pulse 2s ease-in-out infinite;
+    pointer-events: none;
+    z-index: 10;
+  }
+
+  .led-glow-blue::before {
+    top: -2px;
+    left: -2px;
+    border-right: none;
+    border-bottom: none;
+    box-shadow: -3px -3px 15px var(--glow-color);
+  }
+
+  .led-glow-blue::after {
+    bottom: -2px;
+    right: -2px;
+    border-left: none;
+    border-top: none;
+    box-shadow: 3px 3px 15px var(--glow-color);
+  }
+
+  .led-glow-orange {
+    --glow-color: rgba(249, 115, 22, 0.6);
+    --border-color: rgba(249, 115, 22, 1);
+    position: relative;
+    border: 2px solid var(--border-color) !important;
+    animation: led-border-glow 2s ease-in-out infinite;
+  }
+
+  .led-glow-orange::before,
+  .led-glow-orange::after {
+    content: '';
+    position: absolute;
+    width: 30px;
+    height: 30px;
+    border: 2px solid var(--border-color);
+    border-radius: inherit;
+    animation: corner-pulse 2s ease-in-out infinite;
+    pointer-events: none;
+    z-index: 10;
+  }
+
+  .led-glow-orange::before {
+    top: -2px;
+    left: -2px;
+    border-right: none;
+    border-bottom: none;
+    box-shadow: -3px -3px 15px var(--glow-color);
+  }
+
+  .led-glow-orange::after {
+    bottom: -2px;
+    right: -2px;
+    border-left: none;
+    border-top: none;
+    box-shadow: 3px 3px 15px var(--glow-color);
+  }
+}

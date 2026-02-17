@@ -1,0 +1,18 @@
+﻿
+                         
+       isLoading={deleteP
+oolDataMutation.isPending
+ || deleteStakingDataMuta
+tion.isPending || deleteL
+essonsDataMutation.isPend
+ing || deleteTrafficDataM
+utation.isPending || dele
+teUsersDataMutation.isPen
+ding || deleteGameDataMut
+ation.isPending}
+                         
+       isLoading={deleteA
+greementMutation.isPendin
+g}
+
+

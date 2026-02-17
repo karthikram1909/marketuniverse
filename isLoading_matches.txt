@@ -1,0 +1,80 @@
+﻿
+                         
+                   disabl
+ed={deleteApiLogsMutation
+.isLoading}
+                         
+                         
+  disabled={updateApiSett
+ingsMutation.isLoading}
+                         
+                   disabl
+ed={blockWalletMutation.i
+sLoading}
+                         
+                         
+  disabled={unblockWallet
+Mutation.isLoading}
+                         
+                         
+      disabled={deletePoo
+lDataMutation.isLoading}
+                         
+                   disabl
+ed={deleteStakingDataMuta
+tion.isLoading}
+                         
+                         
+                  disable
+d={deleteAgreementMutatio
+n.isLoading}
+                         
+                         
+                         
+ disabled={deleteManualDe
+positMutation.isLoading}
+                         
+                         
+                         
+         disabled={delete
+DepositMutation.isLoading
+}
+                         
+                   disabl
+ed={addAdminMutation.isLo
+ading}
+                         
+                         
+          disabled={remov
+eAdminMutation.isLoading 
+|| allAdmins.length === 
+1}
+                         
+                   disabl
+ed={deleteUsersDataMutati
+on.isLoading}
+                         
+                   disabl
+ed={deleteLessonsDataMuta
+tion.isLoading}
+                         
+                   disabl
+ed={deleteTrafficDataMuta
+tion.isLoading}
+                         
+       isLoading={deleteP
+oolDataMutation.isPending
+ || deleteStakingDataMuta
+tion.isPending || deleteL
+essonsDataMutation.isPend
+ing || deleteTrafficDataM
+utation.isPending || dele
+teUsersDataMutation.isPen
+ding || deleteGameDataMut
+ation.isPending}
+                         
+       isLoading={deleteA
+greementMutation.isPendin
+g}
+
+

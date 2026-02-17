@@ -1,0 +1,8 @@
+﻿
+            // Assuming 
+trophies table exists 
+and relates to user, but 
+base44 had 
+playerTrophies.
+
+

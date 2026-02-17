@@ -1,0 +1,24 @@
+﻿
+            const 
+response = await base44.f
+unctions.invoke('deleteAl
+lData', {});
+                         
+                         
+  const response = await 
+base44.functions.invoke('
+testAPIMonitoring', {});
+                         
+                       
+const response = await ba
+se44.functions.invoke('sc
+anMissingDeposits', {});
+                         
+                         
+      const response = 
+await base44.functions.in
+voke('debugUserWalletAddr
+ess', { wallet_address: 
+wallet });
+
+
