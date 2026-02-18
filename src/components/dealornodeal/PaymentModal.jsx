@@ -131,20 +131,41 @@ export default function PaymentModal({ isOpen, onClose, onSuccess, gameFee, game
             toast.success('Transaction sent! Saving record...');
             console.log('Transaction sent, saving immediately:', { txHash: tx.hash, caseNumber: selectedCase });
 
-            // PHASE 1: Save pending game payment BEFORE waiting for confirmation
+            // PHASE 1: Save payment intent for backend verification
             try {
+                // Insert into payment_intents
+                await supabase.from('payment_intents').insert({
+                    order_id: `CASE-${selectedCase}-${Date.now()}`,
+                    expected_from_address: account.toLowerCase(),
+                    expected_to_address: finalWallet.toLowerCase(),
+                    expected_amount: gameFee,
+                    tx_hash: tx.hash,
+                    status: 'PENDING',
+                    user_id: user?.id // Ensure user_id is linked
+                });
+
+                // Also keep pending_game_payments for legacy support if needed, or just rely on intents.
+                // For now, let's keep the game specific data in a way we can retrieve it.
+                // We'll use metadata or just trust the intent.
+                // Ideally, we should store case_number in payment_intents or a related table.
+                // Let's add case_number to payment_intents via a metadata column or just reuse order_id carefully?
+                // The user schema for payment_intents didn't have case_number. 
+                // Let's assume we can store it in order_id or just add it to pending_game_payments as well for the game creation logic.
+
+                // We'll write to BOTH for now to ensure we don't break game creation which reads pending_game_payments
                 await supabase.from('pending_game_payments').insert({
                     wallet_address: account.toLowerCase(),
                     tx_hash: tx.hash,
                     case_number: selectedCase,
                     game_fee: gameFee,
-                    status: 'pending'
+                    status: 'confirming' // Changed from 'pending' to 'confirming' as we have hash
                 });
-                console.log('✅ Payment record saved immediately:', tx.hash);
-                toast.success('Payment record saved! Waiting for blockchain confirmation...');
+
+                console.log('✅ Payment intent saved:', tx.hash);
+                toast.success('Payment recorded! Backend is monitoring confirmations...');
             } catch (pendingError) {
-                console.warn('Non-critical: Failed to save pending game payment:', pendingError);
-                // Continue flow even if backup logging fails
+                console.error('Failed to save payment intent:', pendingError);
+                toast.error('Failed to save payment record. Please contact support.');
             }
 
             // PHASE 2: Now wait for blockchain confirmation
@@ -177,83 +198,48 @@ export default function PaymentModal({ isOpen, onClose, onSuccess, gameFee, game
 
             // 🔥 NEW: Frontend-driven polling
 
-            // 15-second mandatory verification delay
-            for (let i = 15; i > 0; i--) {
-                setCreatingMessage(`running verification... ${i}s`);
-                await new Promise(resolve => setTimeout(resolve, 1000));
-            }
+            setCreatingMessage(`⚡ Verifying payment on blockchain...`);
 
-            setCreatingMessage(`⚡ Finalizing verification...`);
-
+            // Poll for game creation and confirmations
             let pollAttempts = 0;
-            const maxPollAttempts = 12;
-            const POLL_INTERVAL = 3000; // 3 seconds
+            const maxPollAttempts = 30; // 30 * 2s = 60s max wait
+            const POLL_INTERVAL = 2000; // 2 seconds
 
             const pollForGame = async () => {
                 while (pollAttempts < maxPollAttempts) {
                     pollAttempts++;
 
-                    // Update message without specific time mentions
-                    if (pollAttempts <= 4) {
-                        setCreatingMessage(`🔒 Verifying blockchain confirmations...`);
-                    } else if (pollAttempts <= 8) {
-                        setCreatingMessage(`⚡ Verifying blockchain finality...`);
-                    } else {
-                        setCreatingMessage(`⏳ Almost ready...`);
-                    }
-
                     try {
-                        // Call backend to check status and create game if ready
+                        // Call backend to check status
                         const result = await gameService.checkGamePaymentStatus({
                             txHash: tx.hash
                         });
 
-                        // const result = response.data;
-
-                        // if (result.status === 'completed' && result.game_id) {
-                        //     // Game created successfully!
-                        //     setGameCreating(false);
-                        //     setCreatingMessage('');
-                        //     toast.success('🎮 Game created! Starting now...');
-                        //     onClose();
-                        //     window.location.reload();
-                        //     return true;
-                        // } else if (result.status === 'failed') {
-                        //     toast.error('Payment failed: ' + result.error);
-                        //     setGameCreating(false);
-                        //     return false;
-                        // } else if (result.status === 'confirming') {
-                        //     // Update with confirmation progress
-                        //     setCreatingMessage(`🔒 Confirmations: ${result.confirmations}/${result.required} blocks (${elapsed}s)`);
-                        // }
                         if (result.status === 'completed' && result.game_id) {
-                            // ✅ Game created successfully & payment confirmed
+                            // ✅ Game created!
                             setGameCreating(false);
                             setCreatingMessage('');
                             toast.success('🎮 Game created! Starting now...');
                             onClose();
-
-                            // Navigate to new game without reloading
                             onSuccess(selectedCase, tx.hash, result.game_id);
-
                             return true;
 
                         } else if (result.status === 'failed') {
-                            // ❌ Payment failed or transaction invalid
-
-                            toast.error('Payment failed: ' + result.error);
+                            // ❌ Failed
+                            toast.error('Payment failed: ' + (result.error || 'Unknown error'));
                             setGameCreating(false);
-
                             return false;
 
                         } else if (result.status === 'confirming') {
-                            // ⏳ Transaction is valid but still waiting for blockchain confirmations
-                            setCreatingMessage(`🔒 Verifying blockchain finality...`);
+                            // ⏳ Update UI with confirmations
+                            const confs = result.confirmations || 0;
+                            const req = result.required || 6;
+                            setCreatingMessage(`🔒 Confirmations: ${confs} / ${req}`);
+                            console.log(`Polling: ${confs}/${req} confirmations`);
                         }
 
                     } catch (error) {
                         console.error('Poll error:', error);
-                        // Continue polling even on error
                     }
 
                     await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL));

@@ -1,4 +1,3 @@
--- 1. Reset RLS on Profiles to be safe
 alter table public.profiles enable row level security;
 
 drop policy if exists "Public profiles are viewable by everyone." on public.profiles;
@@ -10,7 +9,6 @@ create policy "Users can insert their own profile." on public.profiles for inser
 drop policy if exists "Users can update own profile." on public.profiles;
 create policy "Users can update own profile." on public.profiles for update using (auth.uid() = id);
 
--- 2. Fix the Trigger Function (ensure it is SECURITY DEFINER)
 create or replace function public.handle_new_user() 
 returns trigger as $$
 begin
@@ -20,9 +18,9 @@ begin
     new.email, 
     new.raw_user_meta_data->>'full_name', 
     'user',
-    new.raw_user_meta_data->>'wallet_address' -- Capture wallet if passed
+    new.raw_user_meta_data->>'wallet_address' 
   )
-  on conflict (id) do nothing; -- Prevent errors if profile exists
+  on conflict (id) do nothing; 
   return new;
 end;
 $$ language plpgsql security definer;

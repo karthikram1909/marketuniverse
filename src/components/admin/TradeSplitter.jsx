@@ -300,7 +300,7 @@ export default function TradeSplitter({ cryptoPoolBalance, vipPoolBalance }) {
 
                 <Button
                     type="submit"
-                    disabled={createTradesMutation.isPending || totalBalance === 0}
+                    disabled={createTradesMutation.isPending}
                     className="w-full bg-gradient-to-r from-[#f5c96a] to-yellow-600 hover:opacity-90 text-black font-bold"
                 >
                     <DollarSign className="w-4 h-4 mr-2" />
