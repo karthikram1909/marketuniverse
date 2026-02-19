@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { base44 } from '@/api/base44Client';
+import { supabase } from '@/lib/supabaseClient';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -24,29 +24,35 @@ export default function SupportForm() {
         setIsSubmitting(true);
 
         try {
-            const supportMessage = await base44.entities.SupportMessage.create({
+            const { error: msgError } = await supabase.from('support_messages').insert({
                 ...formData,
-                wallet_address: account?.toLowerCase() || null
+                wallet_address: account?.toLowerCase() || null,
+                status: 'pending',
+                created_at: new Date().toISOString()
             });
+
+            if (msgError) throw msgError;
 
             // Create notifications for user and admin
             await Promise.all([
-                base44.entities.Notification.create({
+                supabase.from('notifications').insert({
                     wallet_address: account?.toLowerCase() || null,
                     email: formData.email,
                     type: 'trade_completed',
                     title: 'Support Message Received',
                     message: `We received your message about "${formData.subject}". Our team will respond shortly.`,
                     read: false,
-                    is_admin: false
+                    is_admin: false,
+                    created_date: new Date().toISOString()
                 }),
-                base44.entities.Notification.create({
+                supabase.from('notifications').insert({
                     email: formData.email,
                     type: 'trade_completed',
                     title: 'New Support Message',
                     message: `New support message from ${formData.name} (${formData.email}): ${formData.subject}`,
                     read: false,
-                    is_admin: true
+                    is_admin: true,
+                    created_date: new Date().toISOString()
                 })
             ]);
 
@@ -54,6 +60,7 @@ export default function SupportForm() {
             setFormData({ name: '', email: '', subject: '', message: '' });
             setIsOpen(false);
         } catch (error) {
+            console.error('Support form error:', error);
             toast.error('Failed to send message. Please try again.');
         } finally {
             setIsSubmitting(false);
@@ -76,13 +83,13 @@ export default function SupportForm() {
                 }}
             >
                 {/* Glass reflection */}
-                <div 
+                <div
                     className="absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-transparent pointer-events-none"
                     style={{
                         clipPath: 'polygon(0 0, 100% 0, 100% 50%, 0 30%)'
                     }}
                 />
-                
+
                 {/* Animated red shine */}
                 <motion.div
                     className="absolute inset-0 bg-gradient-to-r from-transparent via-red-500/20 to-transparent pointer-events-none"
@@ -95,7 +102,7 @@ export default function SupportForm() {
                         ease: "linear"
                     }}
                 />
-                
+
                 <MessageCircle className="w-6 h-6 text-red-500 relative z-10 pointer-events-none" />
             </button>
 
@@ -116,7 +123,7 @@ export default function SupportForm() {
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, y: 20 }}
                             className="fixed w-[400px] rounded-2xl shadow-2xl p-8 overflow-hidden backdrop-blur-xl border border-white/10"
-                            style={{ 
+                            style={{
                                 zIndex: 50,
                                 bottom: '88px',
                                 right: '24px',
@@ -125,7 +132,7 @@ export default function SupportForm() {
                             }}
                         >
                             {/* Animated Red Background Glow */}
-                            <motion.div 
+                            <motion.div
                                 className="absolute inset-0 pointer-events-none"
                                 animate={{
                                     background: [
@@ -189,7 +196,7 @@ export default function SupportForm() {
                                 <motion.button
                                     type="submit"
                                     disabled={isSubmitting}
-                                    whileHover={{ 
+                                    whileHover={{
                                         scale: 1.02,
                                         boxShadow: '0 8px 40px rgba(220,38,38,0.4)'
                                     }}

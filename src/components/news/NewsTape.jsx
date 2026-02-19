@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
+import { supabase } from '@/lib/supabaseClient';
 import { TrendingUp, Flame } from 'lucide-react';
 
 export default function NewsTape() {
@@ -9,8 +9,9 @@ export default function NewsTape() {
     const { data, isLoading, error } = useQuery({
         queryKey: ['newsTape'],
         queryFn: async () => {
-            const response = await base44.functions.invoke('fetchMarketNews');
-            return response.data;
+            const { data, error } = await supabase.functions.invoke('fetch-market-news');
+            if (error) throw error;
+            return data;
         },
         staleTime: 300000,
         refetchInterval: 300000

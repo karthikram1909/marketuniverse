@@ -1,39 +1,45 @@
 import React, { useEffect, useState } from 'react';
-import { base44 } from '@/api/base44Client';
+import { supabase } from '@/lib/supabaseClient';
 import { useQuery } from '@tanstack/react-query';
 import { Loader2, AlertCircle, Radio } from 'lucide-react';
 import { motion } from 'framer-motion';
 
-export default function YouTubeLiveEmbed({ roomId }) {
+export default function YouTubeLiveEmbed({ roomId, youtubeUrl, isAutoLive }) {
     const [checking, setChecking] = useState(false);
 
-    // Fetch global YouTube settings
+    // Fetch global YouTube settings (fallback if props not provided or for polling)
     const { data: settings, refetch, isLoading } = useQuery({
         queryKey: ['globalYoutubeSettings'],
         queryFn: async () => {
-            const results = await base44.entities.YouTubeSettings.filter({});
-            console.log('YouTube Settings:', results[0]);
-            return results[0] || null;
+            const { data } = await supabase.from('youtube_settings').select('*').limit(1).maybeSingle();
+            return data || null;
         },
-        refetchInterval: 30000 // Check every 30 seconds
+        refetchInterval: 30000,
+        enabled: !youtubeUrl // Only fetch if we don't have a direct URL
     });
 
-    // Check live status (only for public mode)
+    const activeSettings = settings || {};
+    const effectiveUrl = youtubeUrl || activeSettings.youtube_video_url || activeSettings.video_url;
+
+    // Check live status (only for public mode and if we don't have a direct verified URL yet)
     const checkLiveStatus = async () => {
-        if (checking || !settings) return;
-        
-        // Only auto-check for public mode
-        if (settings.stream_type !== 'public') return;
-        
+        if (checking || !activeSettings.stream_type) return;
+
+        // Only auto-check for public mode where channel_id is set
+        if (activeSettings.stream_type !== 'public') return;
+
         setChecking(true);
         try {
-            const response = await base44.functions.invoke('checkYoutubeLiveStatus', {
-                stream_type: settings.stream_type,
-                channel_id: settings.channel_id,
-                video_url: settings.video_url
+            const { data, error } = await supabase.functions.invoke('check-youtube-live-status', {
+                body: {
+                    stream_type: activeSettings.stream_type,
+                    channel_id: activeSettings.channel_id,
+                    video_url: activeSettings.video_url
+                }
             });
-            if (response.data) {
-                console.log('YouTube status:', response.data);
+
+            if (data) {
+                console.log('YouTube status:', data);
             }
             await refetch();
         } catch (error) {
@@ -44,14 +50,14 @@ export default function YouTubeLiveEmbed({ roomId }) {
     };
 
     useEffect(() => {
-        if (settings?.stream_type === 'public') {
+        if (activeSettings.stream_type === 'public' && !youtubeUrl) {
             checkLiveStatus();
-            const interval = setInterval(checkLiveStatus, 30000); // Check every 30 seconds for public
+            const interval = setInterval(checkLiveStatus, 30000);
             return () => clearInterval(interval);
         }
-    }, [settings]);
+    }, [activeSettings.stream_type, youtubeUrl]);
 
-    if (isLoading) {
+    if (isLoading && !youtubeUrl) {
         return (
             <div className="bg-gradient-to-br from-gray-900/50 to-black/50 backdrop-blur-xl border border-gray-800 rounded-xl p-6 text-center">
                 <Loader2 className="w-6 h-6 text-purple-400 animate-spin mx-auto mb-2" />
@@ -60,7 +66,10 @@ export default function YouTubeLiveEmbed({ roomId }) {
         );
     }
 
-    if (!settings || (!settings.channel_id && !settings.video_url)) {
+    // Determine if we have enough config to show anything
+    const hasConfig = effectiveUrl || (activeSettings.channel_id);
+
+    if (!hasConfig) {
         return (
             <div className="bg-gradient-to-br from-gray-900/50 to-black/50 backdrop-blur-xl border border-gray-800 rounded-xl p-6 text-center">
                 <AlertCircle className="w-6 h-6 text-gray-400 mx-auto mb-2" />
@@ -69,7 +78,7 @@ export default function YouTubeLiveEmbed({ roomId }) {
         );
     }
 
-    if (checking && !settings.current_live_video_id) {
+    if (checking && !effectiveUrl) {
         return (
             <div className="bg-gradient-to-br from-gray-900/50 to-black/50 backdrop-blur-xl border border-gray-800 rounded-xl p-6 text-center">
                 <Loader2 className="w-6 h-6 text-purple-400 animate-spin mx-auto mb-2" />
@@ -78,12 +87,27 @@ export default function YouTubeLiveEmbed({ roomId }) {
         );
     }
 
-    if (!settings.is_live || !settings.video_id) {
+    // Extract video ID from URL
+    const getVideoId = (url) => {
+        if (!url) return null;
+        try {
+            const urlObj = new URL(url);
+            if (urlObj.hostname.includes('youtube.com')) {
+                return urlObj.searchParams.get('v');
+            } else if (urlObj.hostname.includes('youtu.be')) {
+                return urlObj.pathname.slice(1);
+            }
+        } catch (e) { return null; }
+        return null;
+    };
+
+    const videoId = getVideoId(effectiveUrl);
+
+    if (!videoId) {
         return (
             <div className="bg-gradient-to-br from-gray-900/50 to-black/50 backdrop-blur-xl border border-gray-800 rounded-xl p-6 text-center">
                 <AlertCircle className="w-6 h-6 text-gray-400 mx-auto mb-2" />
                 <p className="text-sm text-gray-400">No live stream currently</p>
-                <p className="text-xs text-gray-500 mt-1">is_live: {String(settings?.is_live)}, video_id: {settings?.video_id || 'none'}</p>
             </div>
         );
     }
@@ -108,7 +132,7 @@ export default function YouTubeLiveEmbed({ roomId }) {
             <div className="relative bg-black" style={{ paddingBottom: '56.25%' }}>
                 <iframe
                     className="absolute top-0 left-0 w-full h-full"
-                    src={`https://www.youtube.com/embed/${settings.video_id}?autoplay=1&mute=0&enablejsapi=1`}
+                    src={`https://www.youtube.com/embed/${videoId}?autoplay=1&mute=0&enablejsapi=1`}
                     title="YouTube Live Stream"
                     frameBorder="0"
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"

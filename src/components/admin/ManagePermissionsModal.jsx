@@ -1,39 +1,41 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
+import { supabase } from '@/lib/supabaseClient';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { motion } from 'framer-motion';
-import { Lock, Unlock, Shield, Check, X } from 'lucide-react';
+import { Check, X, Shield } from 'lucide-react';
 
 export default function ManagePermissionsModal({ profile, isOpen, onClose }) {
-     const queryClient = useQueryClient();
-     const [permissions, setPermissions] = useState({});
-     const [saveError, setSaveError] = useState(null);
+    const queryClient = useQueryClient();
+    const [permissions, setPermissions] = useState({});
+    const [saveError, setSaveError] = useState(null);
 
-     // Fetch all rooms
-     const { data: rooms = [] } = useQuery({
-         queryKey: ['allChatRooms'],
-         queryFn: () => base44.entities.ChatRoom.filter({})
-     });
+    // Fetch all rooms
+    const { data: rooms = [] } = useQuery({
+        queryKey: ['allChatRooms'],
+        queryFn: async () => {
+            const { data } = await supabase.from('chat_rooms').select('*');
+            return data || [];
+        }
+    });
 
-     // Fetch user's current permissions (using user_id from profile)
-     const { data: userPermissions = [] } = useQuery({
-         queryKey: ['userPermissions', profile?.id],
-         queryFn: async () => {
-             // Guard: user_id is required
-             if (!profile?.id) {
-                 throw new Error('User ID is required to fetch permissions');
-             }
-             return await base44.entities.ChatUserPermission.filter({
-                 user_id: profile.id
-             });
-         },
-         enabled: !!profile?.id && isOpen
-     });
+    // Fetch user's current permissions (using user_id from profile)
+    const { data: userPermissions = [] } = useQuery({
+        queryKey: ['userPermissions', profile?.id],
+        queryFn: async () => {
+            if (!profile?.id) throw new Error('User ID is required');
+            const { data } = await supabase
+                .from('chat_user_permissions')
+                .select('*')
+                .eq('user_id', profile.id);
+            return data || [];
+        },
+        enabled: !!profile?.id && isOpen
+    });
 
     // Initialize permissions state when data loads
-    React.useEffect(() => {
+    useEffect(() => {
         if (userPermissions.length > 0) {
             const permMap = {};
             userPermissions.forEach(perm => {
@@ -44,54 +46,62 @@ export default function ManagePermissionsModal({ profile, isOpen, onClose }) {
                 };
             });
             setPermissions(permMap);
+        } else {
+            setPermissions({});
         }
-    }, [userPermissions]);
+    }, [userPermissions, isOpen]);
 
     // Save permissions mutation
     const savePermissionsMutation = useMutation({
         mutationFn: async (permData) => {
-            // Guard: user_id is required
-            if (!profile?.id) {
-                throw new Error('User ID is missing. Cannot save permissions.');
-            }
+            if (!profile?.id) throw new Error('User ID is missing');
 
-            const promises = [];
+            const updates = [];
+            const deletions = [];
 
             for (const room of rooms) {
-                const existingPerm = userPermissions.find(p => p.room_id === room.id);
                 const newPerm = permData[room.id];
-
-                if (existingPerm && newPerm) {
-                    // Update existing permission
-                    promises.push(
-                        base44.entities.ChatUserPermission.update(existingPerm.id, {
-                            is_authorized: newPerm.is_authorized,
-                            permission_level: newPerm.permission_level
-                        })
-                    );
-                } else if (newPerm && newPerm.is_authorized) {
-                    // Create new permission - user_id is primary identifier
-                    promises.push(
-                        base44.entities.ChatUserPermission.create({
+                // If we have a permission object for this room
+                if (newPerm) {
+                    if (newPerm.is_authorized) {
+                        // Upsert
+                        updates.push({
                             user_id: profile.id,
                             room_id: room.id,
-                            is_authorized: newPerm.is_authorized,
-                            permission_level: newPerm.permission_level
-                        })
-                    );
-                } else if (existingPerm && !newPerm?.is_authorized) {
-                    // Delete permission if user is denied access
-                    promises.push(
-                        base44.entities.ChatUserPermission.delete(existingPerm.id)
-                    );
+                            is_authorized: true,
+                            permission_level: newPerm.permission_level || 'read_write'
+                        });
+                    } else {
+                        // Use delete or update to authorized=false? 
+                        // The UI implies "Denied" means removing access or setting check to false.
+                        // If we want to store explicit denial, we can update is_authorized=false.
+                        // Or we can delete the row. 
+                        // The original code tried to delete if !is_authorized.
+                        // Let's stick to deleting the permission row if not authorized, 
+                        // UNLESS we want to blacklist? 
+                        // The UI says "Denied". 
+                        // If we delete, it falls back to default? 
+                        // If default is 'open', deleting means 'open'.
+                        // But rooms might be private.
+                        // Let's assuming explicit permission required. 
+                        // If I set is_authorized=false, it's explicit denial.
+                        updates.push({
+                            user_id: profile.id,
+                            room_id: room.id,
+                            is_authorized: false,
+                            permission_level: 'read_write'
+                        });
+                    }
                 }
             }
 
-            await Promise.all(promises);
+            if (updates.length > 0) {
+                const { error } = await supabase.from('chat_user_permissions').upsert(updates, { onConflict: 'user_id, room_id' });
+                if (error) throw error;
+            }
         },
         onSuccess: () => {
             setSaveError(null);
-            // Invalidate cache with user_id key
             queryClient.invalidateQueries({ queryKey: ['userPermissions', profile?.id] });
             onClose();
         },
@@ -117,7 +127,7 @@ export default function ManagePermissionsModal({ profile, isOpen, onClose }) {
             ...prev,
             [roomId]: {
                 ...prev[roomId],
-                is_authorized: prev[roomId]?.is_authorized !== false,
+                is_authorized: true,
                 permission_level: level
             }
         }));
@@ -160,28 +170,28 @@ export default function ManagePermissionsModal({ profile, isOpen, onClose }) {
                             <h3 className="text-sm font-bold text-purple-300 uppercase tracking-wider px-2">
                                 {category}
                             </h3>
-                            
+
                             <div className="space-y-2">
                                 {categoryRooms.map(room => {
+                                    // Default to unauthorized if not found in state
                                     const perm = permissions[room.id] || { is_authorized: false, permission_level: 'read_write' };
-                                    
+
                                     return (
                                         <motion.div
                                             key={room.id}
                                             initial={{ opacity: 0 }}
                                             animate={{ opacity: 1 }}
-                                            className={`bg-white/5 border rounded-lg p-4 transition-all ${
-                                                perm.is_authorized 
-                                                    ? 'border-purple-500/40 bg-purple-500/10' 
+                                            className={`bg-white/5 border rounded-lg p-4 transition-all ${perm.is_authorized
+                                                    ? 'border-purple-500/40 bg-purple-500/10'
                                                     : 'border-white/10'
-                                            }`}
+                                                }`}
                                         >
                                             <div className="flex items-start justify-between gap-4">
                                                 <div className="flex items-center gap-3 flex-1">
                                                     {room.channel_avatar_url && (
-                                                        <img 
-                                                            src={room.channel_avatar_url} 
-                                                            alt={room.name} 
+                                                        <img
+                                                            src={room.channel_avatar_url}
+                                                            alt={room.name}
                                                             className="w-10 h-10 rounded-full object-cover"
                                                         />
                                                     )}
@@ -201,11 +211,10 @@ export default function ManagePermissionsModal({ profile, isOpen, onClose }) {
                                                     {/* Authorization Toggle */}
                                                     <button
                                                         onClick={() => toggleAuthorization(room.id)}
-                                                        className={`px-4 py-2 rounded-lg font-semibold transition-all flex items-center gap-2 ${
-                                                            perm.is_authorized
+                                                        className={`px-4 py-2 rounded-lg font-semibold transition-all flex items-center gap-2 ${perm.is_authorized
                                                                 ? 'bg-green-600 hover:bg-green-700 text-white'
                                                                 : 'bg-red-600/30 hover:bg-red-600/50 text-red-400 border border-red-500/50'
-                                                        }`}
+                                                            }`}
                                                     >
                                                         {perm.is_authorized ? (
                                                             <>

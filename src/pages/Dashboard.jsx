@@ -150,7 +150,7 @@ function DashboardContent() {
     const isProfileComplete = () => {
         if (!user) return false;
         return !!(
-            user.full_name &&
+            (user.display_name || user.full_name) &&
             user.email &&
             user.telephone &&
             user.withdrawal_wallet_address &&

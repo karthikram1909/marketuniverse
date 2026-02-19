@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { base44 } from '@/api/base44Client';
+import { supabase } from '@/lib/supabaseClient';
 
 /**
  * Global chat catch-up hook
@@ -10,17 +10,16 @@ export function useGlobalChatCatchUp({ isApproved, chatProfile, rooms, messageSt
     // Concurrency control
     const catchUpInProgressRef = useRef(false);
     const lastCatchUpAtRef = useRef(0);
-    
+
     // Telemetry (silent)
     const runsCount = useRef(0);
     const skippedByLockCount = useRef(0);
     const skippedByDebounceCount = useRef(0);
-    const totalMessagesFetched = useRef(0);
 
     useEffect(() => {
-        if (!isApproved || !chatProfile || rooms.length === 0) return;
-
         const handleGlobalCatchUp = async () => {
+            if (!isApproved || !chatProfile || !rooms || rooms.length === 0) return;
+
             // Lock: prevent concurrent runs
             if (catchUpInProgressRef.current) {
                 skippedByLockCount.current++;
@@ -37,58 +36,39 @@ export function useGlobalChatCatchUp({ isApproved, chatProfile, rooms, messageSt
             catchUpInProgressRef.current = true;
             lastCatchUpAtRef.current = now;
             runsCount.current++;
-            
-            let fetchedThisRun = 0;
-            
+
             try {
                 // Stable room snapshot to avoid mutation during iteration
                 const roomSnapshot = [...rooms];
-                
+
                 for (const room of roomSnapshot) {
-                     // Skip rooms with active reconciliation - let reconciliation handle them
-                     if (activeReconciliationLocks[room.id]) {
-                         continue;
-                     }
+                    // Skip rooms with active reconciliation - let reconciliation handle them
+                    if (activeReconciliationLocks[room.id]) {
+                        continue;
+                    }
 
-                     const cursor = messageStore.getLastServerCursor(room.id);
+                    const cursor = messageStore.getLastServerCursor(room.id);
+                    // Skip catch-up if we have no cursor (room not yet loaded or empty)
+                    if (!cursor) continue;
 
-                     try {
-                         // INVARIANT: All fetches after a cursor use composite ordering
-                         // to prevent messages with identical timestamps but higher IDs from being dropped
-                         let query = { room_id: room.id };
-                         if (cursor) {
-                             // Fetch messages where created_date > cursor OR (created_date == cursor AND id > cursor.id)
-                             query = {
-                                 room_id: room.id,
-                                 $or: [
-                                     { created_date: { $gt: cursor.created_date } },
-                                     {
-                                         created_date: cursor.created_date,
-                                         id: { $gt: cursor.id }
-                                     }
-                                 ]
-                             };
-                         }
+                    let query = supabase.from('chat_messages').select('*').eq('room_id', room.id).order('created_at', { ascending: true }).limit(100);
 
-                         const catchUpMessages = await base44.entities.ChatMessage.filter(
-                             query,
-                             'created_date',
-                             100
-                         );
+                    // Fetch messages created AFTER the cursor
+                    query = query.gt('created_at', cursor.created_date);
 
-                        if (catchUpMessages.length > 0) {
-                            fetchedThisRun += catchUpMessages.length;
-                            messageStore.mergeMessages(room.id, catchUpMessages, 'server');
-                        }
-                    } catch (err) {
-                        console.error(`Catch-up failed for ${room.name}:`, err);
+                    const { data: catchUpMessages, error } = await query;
+
+                    if (error) {
+                        console.error(`Catch-up fetch error for room ${room.name}:`, error);
+                        continue;
+                    }
+
+                    if (catchUpMessages && catchUpMessages.length > 0) {
+                        messageStore.mergeMessages(room.id, catchUpMessages, 'server');
                     }
                 }
-                
-                totalMessagesFetched.current += fetchedThisRun;
-                if (fetchedThisRun > 0) {
-                    console.log(`GlobalCatchUp: rooms=${roomSnapshot.length}, messages=${fetchedThisRun}`);
-                }
+            } catch (err) {
+                console.error("Global catch-up error:", err);
             } finally {
                 catchUpInProgressRef.current = false;
             }
@@ -106,6 +86,11 @@ export function useGlobalChatCatchUp({ isApproved, chatProfile, rooms, messageSt
 
         window.addEventListener('focus', handleFocus);
         document.addEventListener('visibilitychange', handleVisibilityChange);
+
+        // Initial run on mount if approved
+        if (isApproved) {
+            handleGlobalCatchUp();
+        }
 
         return () => {
             window.removeEventListener('focus', handleFocus);

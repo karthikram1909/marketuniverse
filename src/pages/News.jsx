@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
+import { supabase } from '@/lib/supabaseClient';
 import { motion } from 'framer-motion';
 import { Newspaper, ExternalLink, TrendingUp, Calendar, Loader2, AlertCircle } from 'lucide-react';
 import Navbar from '../components/landing/Navbar';
@@ -15,8 +15,9 @@ export default function News() {
     const { data, isLoading, error, refetch } = useQuery({
         queryKey: ['marketNews'],
         queryFn: async () => {
-            const response = await base44.functions.invoke('fetchMarketNews');
-            return response.data;
+            const { data, error } = await supabase.functions.invoke('fetch-market-news');
+            if (error) throw error;
+            return data;
         },
         staleTime: 300000,
         refetchInterval: false,
@@ -28,7 +29,7 @@ export default function News() {
     // Filter news by category and search query
     const filteredNews = news.filter(article => {
         const categoryMatch = selectedCategory === 'all' || article.category === selectedCategory;
-        const searchMatch = searchQuery === '' || 
+        const searchMatch = searchQuery === '' ||
             article.headline?.toLowerCase().includes(searchQuery.toLowerCase()) ||
             article.summary?.toLowerCase().includes(searchQuery.toLowerCase());
         return categoryMatch && searchMatch;
@@ -38,9 +39,9 @@ export default function News() {
         <div className="min-h-screen bg-black">
             <Navbar />
             <NewsTape />
-            
+
             {/* Animated Background */}
-            <motion.div 
+            <motion.div
                 className="fixed inset-0 pointer-events-none"
                 animate={{
                     background: [
@@ -52,7 +53,7 @@ export default function News() {
                 transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
             />
 
-            
+
             <div className="relative z-10 pt-44 pb-16 px-4">
                 <div className="max-w-7xl mx-auto">
                     {/* Header */}
@@ -151,8 +152,8 @@ export default function News() {
                                     {/* Article Image */}
                                     {article.image && (
                                         <div className="relative h-48 overflow-hidden">
-                                            <img 
-                                                src={article.image} 
+                                            <img
+                                                src={article.image}
                                                 alt={article.headline}
                                                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                                             />

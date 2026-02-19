@@ -205,6 +205,10 @@ export default function UserProfileForm() {
                                     src={formData.avatar_url}
                                     alt="Profile"
                                     className="w-20 h-20 rounded-full object-cover border-2 border-purple-500"
+                                    onError={(e) => {
+                                        console.error('Failed to load avatar:', formData.avatar_url);
+                                        e.target.src = 'https://ui-avatars.com/api/?name=User&background=random'; // Fallback
+                                    }}
                                 />
                                 <button
                                     type="button"

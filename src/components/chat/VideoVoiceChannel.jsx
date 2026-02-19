@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { base44 } from '@/api/base44Client';
+import { supabase } from '@/lib/supabaseClient';
 import { Button } from '@/components/ui/button';
 import { Video, Phone, X } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -15,9 +15,14 @@ export default function VideoVoiceChannel({ roomID, channelName }) {
             setError(null);
 
             // Get token from backend
-            const { data } = await base44.functions.invoke('generateZegoToken', { 
-                roomID: roomID 
+            const { data, error } = await supabase.functions.invoke('generate-zego-token', {
+                body: { roomID: roomID }
             });
+
+            if (error) {
+                console.error('Supabase function error:', error);
+                throw new Error(error.message || 'Failed to generate token');
+            }
 
             if (!data.token) {
                 throw new Error('Failed to generate Zego token');

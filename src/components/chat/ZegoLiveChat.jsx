@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { base44 } from '@/api/base44Client';
+import { supabase } from '@/lib/supabaseClient';
 import { Send, Loader2, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -43,7 +43,15 @@ export default function ZegoLiveChat({ roomId }) {
             // Try to get authenticated user, fallback to guest
             let currentUser = null;
             try {
-                currentUser = await base44.auth.me();
+                const { data: { user } } = await supabase.auth.getUser();
+                if (user) {
+                    currentUser = {
+                        id: user.id,
+                        email: user.email,
+                        full_name: user.user_metadata?.full_name || user.email,
+                        wallet_address: user.user_metadata?.wallet_address
+                    };
+                }
             } catch (err) {
                 console.log('🟡 No authenticated user, using guest mode');
             }
@@ -51,31 +59,38 @@ export default function ZegoLiveChat({ roomId }) {
             // Generate guest user if not authenticated
             const guestId = `guest_${Math.random().toString(36).substring(7)}`;
             const displayName = currentUser?.full_name || currentUser?.email || `Guest${Math.floor(Math.random() * 9999)}`;
-            
+
             setUser(currentUser || { full_name: displayName, email: guestId });
 
             // Generate Zego token
             console.log('🟢 Requesting Zego token...');
-            const tokenResponse = await base44.functions.invoke('generateZegoToken', {
-                roomID: roomId,
-                role: 1,
-                guestMode: !currentUser,
-                guestId: guestId,
-                guestName: displayName
+            const { data, error } = await supabase.functions.invoke('generate-zego-token', {
+                body: {
+                    roomID: roomId,
+                    role: 1,
+                    guestMode: !currentUser,
+                    guestId: guestId,
+                    guestName: displayName
+                }
             });
 
-            console.log('🟢 Token response received:', {
-                hasData: !!tokenResponse.data,
-                hasToken: !!tokenResponse.data?.token,
-                hasAppID: !!tokenResponse.data?.appID,
-                hasUserID: !!tokenResponse.data?.userID
-            });
-
-            if (tokenResponse.data?.error) {
-                throw new Error(tokenResponse.data.error);
+            if (error) {
+                console.error('Supabase function error:', error);
+                throw new Error(error.message || 'Failed to generate token');
             }
 
-            const { token, appID, userID, userName } = tokenResponse.data;
+            console.log('🟢 Token response received:', {
+                hasData: !!data,
+                hasToken: !!data?.token,
+                hasAppID: !!data?.appID,
+                hasUserID: !!data?.userID
+            });
+
+            if (data?.error) {
+                throw new Error(data.error);
+            }
+
+            const { token, appID, userID, userName } = data;
 
             if (!token || !appID || !userID) {
                 throw new Error('Invalid token response from server');
@@ -87,7 +102,7 @@ export default function ZegoLiveChat({ roomId }) {
                 const script = document.createElement('script');
                 script.src = 'https://cdn.jsdelivr.net/npm/zego-zim-web@2.15.0/index.js';
                 script.crossOrigin = 'anonymous';
-                
+
                 await new Promise((resolve, reject) => {
                     script.onload = resolve;
                     script.onerror = () => reject(new Error('Failed to load Zego ZIM SDK'));
@@ -143,11 +158,11 @@ export default function ZegoLiveChat({ roomId }) {
 
         setSending(true);
         const messageContent = newMessage;
-        
+
         try {
             const messageTextObj = { type: 1, message: messageContent, priority: 1 };
             await zegoInstance.current.sendMessage(messageTextObj, roomId, 2, { priority: 1 });
-            
+
             // Add to local state immediately for instant feedback
             setMessages(prev => [...prev, {
                 id: Date.now(),
@@ -226,11 +241,10 @@ export default function ZegoLiveChat({ roomId }) {
                                 className={`flex ${isCurrentUser ? 'justify-end' : 'justify-start'}`}
                             >
                                 <div
-                                    className={`max-w-[80%] px-3 py-2 rounded-lg ${
-                                        isCurrentUser
+                                    className={`max-w-[80%] px-3 py-2 rounded-lg ${isCurrentUser
                                             ? 'bg-gradient-to-r from-red-600 to-red-700 text-white'
                                             : 'bg-white/10 text-gray-200'
-                                    }`}
+                                        }`}
                                 >
                                     {!isCurrentUser && (
                                         <p className="text-xs text-red-400 font-semibold mb-1">

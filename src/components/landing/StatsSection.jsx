@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { base44 } from '@/api/base44Client';
+import { supabase } from '@/lib/supabaseClient';
 import { useQuery } from '@tanstack/react-query';
 import { DollarSign, Users, TrendingUp, Shield, ArrowUpRight, Wallet } from 'lucide-react';
 import { calculatePoolMetrics } from '../pools/TimeBasedCalculations';
@@ -11,7 +11,9 @@ export default function StatsSection() {
     const { data: allInvestors = [] } = useQuery({
         queryKey: ['allInvestors'],
         queryFn: async () => {
-            return await base44.entities.PoolInvestor.list();
+            const { data, error } = await supabase.from('pool_investors').select('*');
+            if (error) throw error;
+            return data;
         }
     });
 
@@ -19,7 +21,9 @@ export default function StatsSection() {
     const { data: allTrades = [] } = useQuery({
         queryKey: ['allTrades'],
         queryFn: async () => {
-            return await base44.entities.PoolTrade.list();
+            const { data, error } = await supabase.from('pool_trades').select('*');
+            if (error) throw error;
+            return data;
         }
     });
 
@@ -27,7 +31,9 @@ export default function StatsSection() {
     const { data: allWithdrawals = [] } = useQuery({
         queryKey: ['allWithdrawals'],
         queryFn: async () => {
-            return await base44.entities.WithdrawalRequest.list();
+            const { data, error } = await supabase.from('withdrawal_requests').select('*');
+            if (error) throw error;
+            return data;
         }
     });
 
@@ -35,7 +41,9 @@ export default function StatsSection() {
     const { data: poolSettings = [] } = useQuery({
         queryKey: ['poolSettings'],
         queryFn: async () => {
-            return await base44.entities.PoolSettings.list();
+            const { data, error } = await supabase.from('pool_settings').select('*');
+            if (error) throw error;
+            return data;
         }
     });
 
@@ -56,7 +64,7 @@ export default function StatsSection() {
         // Calculate Net PnL from all pools (Gross PnL - Fees - Profit Share)
         const totalGrossPnl = allTrades.reduce((sum, t) => sum + (t.pnl || 0), 0);
         const totalFees = allTrades.reduce((sum, t) => sum + (t.fee || 0), 0);
-        
+
         // Calculate total profit share across all pools
         const totalProfitShare = allTrades.reduce((sum, trade) => {
             const cleanPnl = (trade.pnl || 0) - (trade.fee || 0);
@@ -82,14 +90,14 @@ export default function StatsSection() {
             const poolTrades = allTrades.filter(t => t.pool_type === poolType);
             const poolWithdrawals = allWithdrawals.filter(w => w.pool_type === poolType);
             const settings = poolSettings.find(s => s.pool_type === poolType);
-            
+
             const metrics = calculatePoolMetrics({
                 trades: poolTrades,
                 investors: poolInvestors,
                 withdrawals: poolWithdrawals,
                 profitShareRate: settings?.profit_share_rate || 0
             });
-            
+
             totalPoolBalance += metrics.totalBalance;
         });
 
@@ -155,8 +163,8 @@ export default function StatsSection() {
     return (
         <section className="relative py-24 px-6">
             <div className="absolute inset-0 bg-black" />
-            
-            <motion.div 
+
+            <motion.div
                 className="absolute inset-0"
                 animate={{ opacity: [0.3, 0.5, 0.3] }}
                 transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
@@ -164,7 +172,7 @@ export default function StatsSection() {
                     background: 'radial-gradient(ellipse at center, rgba(220,38,38,0.08) 0%, transparent 60%)',
                 }}
             />
-            
+
             {[...Array(8)].map((_, i) => (
                 <motion.div
                     key={`stats-orb-${i}`}
@@ -218,27 +226,25 @@ export default function StatsSection() {
                             transition={{ delay: index * 0.1 }}
                             className="group"
                         >
-                            <div className={`h-full bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-6 hover:bg-white/10 hover:border-white/20 transition-all duration-300 ${
-                                index === 0 ? 'led-glow-cyan' : 
-                                index === 1 ? 'led-glow-green' : 
-                                index === 2 ? 'led-glow-blue' : 
-                                index === 3 ? 'led-glow-green' : 
-                                index === 4 ? 'led-glow-purple' : 
-                                'led-glow-red'
-                            }`}>
+                            <div className={`h-full bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-6 hover:bg-white/10 hover:border-white/20 transition-all duration-300 ${index === 0 ? 'led-glow-cyan' :
+                                    index === 1 ? 'led-glow-green' :
+                                        index === 2 ? 'led-glow-blue' :
+                                            index === 3 ? 'led-glow-green' :
+                                                index === 4 ? 'led-glow-purple' :
+                                                    'led-glow-red'
+                                }`}>
                                 <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${stat.gradient} p-0.5 mb-4`}>
                                     <div className="w-full h-full rounded-xl bg-[#0a0f1a] flex items-center justify-center">
                                         <stat.icon className="w-5 h-5 text-white" />
                                     </div>
                                 </div>
                                 <p className="text-gray-400 text-sm mb-2">{stat.label}</p>
-                                <h3 className={`text-2xl font-bold mb-1 ${
-                                    stat.isPositive !== undefined 
-                                        ? stat.isPositive 
-                                            ? 'text-green-400' 
+                                <h3 className={`text-2xl font-bold mb-1 ${stat.isPositive !== undefined
+                                        ? stat.isPositive
+                                            ? 'text-green-400'
                                             : 'text-red-400'
                                         : 'text-white'
-                                }`}>
+                                    }`}>
                                     {stat.value}
                                 </h3>
                                 <p className="text-gray-500 text-xs">{stat.description}</p>

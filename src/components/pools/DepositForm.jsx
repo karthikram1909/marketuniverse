@@ -8,6 +8,7 @@ import PaymentModal from '../staking/PaymentModal';
 import { supabase } from '@/lib/supabaseClient';
 import { useQuery } from '@tanstack/react-query';
 import { logInitialized, logPending, logTransactionRound, logSuccess, logFailure } from '../utils/transactionLogger';
+import { poolPaymentService } from '@/api/poolPaymentService';
 
 // Pool deposit form component - handles USDT BEP-20 deposits
 const BSC_PARAMS = {
@@ -37,8 +38,10 @@ export default function DepositForm({ poolAddress, poolType, depositsLocked, onD
     const [pendingTxHash, setPendingTxHash] = useState(null);
     const [verifying, setVerifying] = useState(false);
     const [confirmations, setConfirmations] = useState(0);
+    const [targetConfirmations, setTargetConfirmations] = useState(12);
     const [usdtContract, setUsdtContract] = useState(null);
     const [user, setUser] = useState(null);
+    const [intentId, setIntentId] = useState(null); // Add state for intent tracking
 
     // Fetch USDT contract address from PoolSettings
     const { data: poolSettings } = useQuery({
@@ -120,95 +123,122 @@ export default function DepositForm({ poolAddress, poolType, depositsLocked, onD
         }
     }, [userInvestment, poolType]);
 
-    // Poll pending transactions every 30 seconds (READ-ONLY after processing)
+    // Poll for active intent status
     useEffect(() => {
-        if (!pendingTxHash || !verifying) return;
+        if (!intentId) return;
 
+        let isMounted = true;
         const interval = setInterval(async () => {
-            // Fetch current status without calling verifyBscTransaction
-            const { data: pendingTxs } = await supabase
-                .from('pending_transactions')
-                .select('*')
-                .eq('tx_hash', pendingTxHash)
-                .eq('wallet_address', account.toLowerCase())
-                .eq('pool_type', poolType);
-
-            if (pendingTxs.length > 0) {
-                const tx = pendingTxs[0];
-
-                if (tx.status === 'completed') {
-                    setVerifying(false);
-                    setPendingTxHash(null);
-                    setPaymentModal({
-                        isOpen: true,
-                        type: 'success',
-                        message: 'Your deposit has been confirmed and credited!'
-                    });
-                    if (onDepositSuccess) onDepositSuccess();
-                } else if (tx.status === 'processing') {
-                    // Just update UI message, don't call verifyBscTransaction
-                    setPaymentModal({
-                        isOpen: true,
-                        type: 'processing',
-                        message: 'Deposit received and secured on blockchain. Final credit will complete within 5 minutes. You may safely close this window.'
-                    });
-                } else {
-                    // Only call verifyBscTransaction for 'pending' or 'verifying'
-                    await verifyPendingTransaction(pendingTxHash);
-                }
-            }
-        }, 30000); // 30 seconds
-
-        return () => clearInterval(interval);
-    }, [pendingTxHash, verifying, account, poolType]);
-
-    // Check for pending transactions on component mount
-    useEffect(() => {
-        if (!account) return;
-
-        const checkPending = async () => {
             try {
-                const { data: pending } = await supabase
-                    .from('pending_transactions')
-                    .select('*')
-                    .eq('wallet_address', account.toLowerCase())
-                    .eq('pool_type', poolType)
-                    .in('status', ['pending', 'verifying', 'processing']);
+                const statusData = await poolPaymentService.checkPaymentStatus(intentId);
 
-                if (pending.length > 0) {
-                    const tx = pending[0];
-                    setPendingTxHash(tx.tx_hash);
-                    setVerifying(true);
+                if (!isMounted) return;
 
-                    // Check if already in 'processing' or 'completed' status
-                    if (tx.status === 'processing') {
-                        setPaymentModal({
-                            isOpen: true,
-                            type: 'processing',
-                            message: 'Deposit received and secured on blockchain. Final credit will complete within 5 minutes. You may safely close this window.'
-                        });
-                        // Do NOT call verifyPendingTransaction - backend automation handles it
-                    } else if (tx.status === 'completed') {
-                        setVerifying(false);
-                        setPendingTxHash(null);
+                if (statusData.status === 'CONFIRMED' || statusData.status === 'COMPLETED') {
+                    // Finalize if confirmed (idempotent)
+                    clearInterval(interval);
+                    setVerifying(false);
+
+                    // If already completed in DB (COMPLETED), just success
+                    if (statusData.status === 'COMPLETED') {
                         setPaymentModal({
                             isOpen: true,
                             type: 'success',
                             message: 'Your deposit has been confirmed and credited!'
                         });
+                        setIntentId(null);
+                        setPendingTxHash(null);
                         if (onDepositSuccess) onDepositSuccess();
-                    } else {
-                        // Only verify if status is 'pending' or 'verifying'
-                        await verifyPendingTransaction(tx.tx_hash);
+                        return;
                     }
+
+                    setPaymentModal({
+                        isOpen: true,
+                        type: 'processing',
+                        message: 'Payment confirmed! Finalizing deposit...'
+                    });
+
+                    try {
+                        await poolPaymentService.finalizeDeposit(intentId);
+                        setPaymentModal({
+                            isOpen: true,
+                            type: 'success',
+                            message: 'Your deposit has been successfully credited!'
+                        });
+                        if (onDepositSuccess) onDepositSuccess();
+                    } catch (err) {
+                        console.error('Finalize error:', err);
+                        // If error is "already processed", treat as success
+                        if (err.message && err.message.includes('already processed')) {
+                            setPaymentModal({
+                                isOpen: true,
+                                type: 'success',
+                                message: 'Your deposit has been successfully credited!'
+                            });
+                        } else {
+                            setPaymentModal({
+                                isOpen: true,
+                                type: 'error',
+                                message: 'Deposit confirmed but finalization failed. Please contact support.'
+                            });
+                        }
+                    }
+                    setIntentId(null);
+                    setPendingTxHash(null);
+
+                } else if (statusData.status === 'CONFIRMING') {
+                    setConfirmations(statusData.confirmations || 0);
+                    if (statusData.target_confirmations) setTargetConfirmations(statusData.target_confirmations);
+                    setVerifying(true);
+                } else if (statusData.status === 'FAILED') {
+                    clearInterval(interval);
+                    setVerifying(false);
+                    setPaymentModal({
+                        isOpen: true,
+                        type: 'error',
+                        message: 'Payment verification failed on blockchain.'
+                    });
+                    setIntentId(null);
                 }
+
+                if (statusData.tx_hash && !pendingTxHash) {
+                    setPendingTxHash(statusData.tx_hash);
+                }
+
             } catch (error) {
-                console.error('Failed to check pending transactions:', error);
+                console.error('Polling error:', error);
+            }
+        }, 3000); // 3 seconds
+
+        return () => { isMounted = false; clearInterval(interval); };
+    }, [intentId, onDepositSuccess]);
+
+    // Check for active intent on mount (Recovery)
+    useEffect(() => {
+        if (!user?.id || !poolType) return;
+
+        const checkActive = async () => {
+            try {
+                const activeIntent = await poolPaymentService.getActiveIntent(user.id, poolType);
+                if (activeIntent) {
+                    console.log('✅ Recovered active intent:', activeIntent.id);
+                    setIntentId(activeIntent.id);
+                    setVerifying(true);
+                    if (activeIntent.tx_hash) setPendingTxHash(activeIntent.tx_hash);
+
+                    setPaymentModal({
+                        isOpen: true,
+                        type: 'processing',
+                        message: 'Resuming verification for previous deposit...'
+                    });
+                }
+            } catch (e) {
+                console.error('Error recovering intent:', e);
             }
         };
 
-        checkPending();
-    }, [account, poolType]);
+        checkActive();
+    }, [user, poolType]);
 
     const initProvider = async () => {
         try {
@@ -380,6 +410,8 @@ export default function DepositForm({ poolAddress, poolType, depositsLocked, onD
         }
     };
 
+
+
     const handleDeposit = async () => {
         // Validate prerequisites first
         if (!usdtContract) {
@@ -409,18 +441,7 @@ export default function DepositForm({ poolAddress, poolType, depositsLocked, onD
             return;
         }
 
-        const transactionId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-
-        // LOG STAGE 1: INITIALIZED
-        logInitialized(transactionId, {
-            userId: account,
-            amount: parseFloat(amount),
-            token: 'USDT',
-            walletAddress: account,
-            poolAddress,
-            poolType
-        });
-
+        // Basic validations
         if (!amount || parseFloat(amount) <= 0) {
             setPaymentModal({
                 isOpen: true,
@@ -448,7 +469,7 @@ export default function DepositForm({ poolAddress, poolType, depositsLocked, onD
             return;
         }
 
-        // Balance gating: Allow admins to bypass balance check for testing
+        // Balance check
         if (parseFloat(amount) > parseFloat(balance) && user?.role !== 'admin') {
             setPaymentModal({
                 isOpen: true,
@@ -458,7 +479,7 @@ export default function DepositForm({ poolAddress, poolType, depositsLocked, onD
             return;
         }
 
-        // Deposits locked gating: Allow admins to bypass locks for testing
+        // Lock check
         if (depositsLocked && user?.role !== 'admin') {
             setPaymentModal({
                 isOpen: true,
@@ -472,173 +493,69 @@ export default function DepositForm({ poolAddress, poolType, depositsLocked, onD
         setPaymentModal({
             isOpen: true,
             type: 'processing',
-            message: 'Processing your deposit. Please confirm in MetaMask and wait for blockchain confirmation...'
+            message: 'Initializing deposit. Please confirm in MetaMask...'
         });
-
-        let pendingTxId = null;
-        let intentId = null;
-
-        // BEST-EFFORT: Create DepositIntent before MetaMask transaction
-        // This captures user intent even if frontend-backend communication fails after MetaMask confirms
-        try {
-            // Fetch current BSC block number for intent-bounded scanning
-            let currentBlock = 0;
-            try {
-                const blockResponse = await fetch('https://bsc-dataseed.binance.org/', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        jsonrpc: '2.0',
-                        method: 'eth_blockNumber',
-                        params: [],
-                        id: 1
-                    })
-                });
-                const blockData = await blockResponse.json();
-                if (blockData.result) {
-                    currentBlock = parseInt(blockData.result, 16);
-                    console.log('✅ Current BSC block:', currentBlock);
-                }
-            } catch (blockError) {
-                console.warn('⚠️ Failed to fetch current block (non-blocking):', blockError);
-            }
-
-            const expiresAt = new Date();
-            expiresAt.setHours(expiresAt.getHours() + 24); // 24 hours from now
-
-            const intentData = {
-                wallet_address: account.toLowerCase(),
-                pool_address: poolAddress.toLowerCase(),
-                expected_amount: parseFloat(amount),
-                pool_type: poolType,
-                status: 'initiated',
-                start_block: currentBlock > 0 ? currentBlock : null,
-                created_at: new Date().toISOString(),
-                expires_at: expiresAt.toISOString()
-            };
-
-            // Add duration_months only for traditional pool
-            if (poolType === 'traditional') {
-                intentData.duration_months = durationMonths;
-            }
-
-            const { data: intent } = await supabase.from('deposit_intents').insert(intentData).select().single();
-            const intentId = intent?.id;
-            console.log('✅ DepositIntent created:', intentId);
-        } catch (intentError) {
-            // Log but DO NOT block MetaMask transaction
-            console.warn('⚠️ Failed to create DepositIntent (non-blocking):', intentError);
-        }
 
         try {
             await ensureBSC();
 
-            // Load ethers dynamically if not available
-            if (!window.ethers) {
-                await new Promise((resolve, reject) => {
-                    const script = document.createElement('script');
-                    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js';
-                    script.onload = resolve;
-                    script.onerror = reject;
-                    document.head.appendChild(script);
-                });
-            }
+            // 1. Create Payment Intent FIRST (DB state)
+            const intent = await poolPaymentService.createPaymentIntent({
+                amount: parseFloat(amount),
+                poolType,
+                userAddress: account,
+                poolAddress,
+                durationMonths: poolType === 'traditional' ? durationMonths : null
+            });
 
+            console.log('✅ Payment Intent Created:', intent.id);
+            setIntentId(intent.id);
+
+            // 2. Perform Blockchain Transaction
             const { ethers } = window;
             const web3Provider = new ethers.providers.Web3Provider(window.ethereum);
             const signer = web3Provider.getSigner();
 
-            // Validate and checksum the pool address
-            // FIX: Check for placeholder addresses and use the real one if found
+            // Validate pool address
             let targetAddress = poolAddress;
             if (targetAddress === '0xScalpingPoolAddress123' || targetAddress === '0xVipPoolAddress456') {
-                console.warn('⚠️ Detected placeholder pool address. Using fallback valid address.');
-                targetAddress = '0x508D61ad3f1559679BfAe3942508B4cf7767935A'; // User's valid wallet
+                // Fallback for demo environment
+                targetAddress = '0x508D61ad3f1559679BfAe3942508B4cf7767935A';
             }
             const validPoolAddress = ethers.utils.getAddress(targetAddress);
-
             const token = new ethers.Contract(usdtContract, ERC20_ABI, signer);
-
             const decimals = await token.decimals();
             const amountWei = ethers.utils.parseUnits(amount, decimals);
 
             const tx = await token.transfer(validPoolAddress, amountWei);
             const txHash = tx.hash;
+            console.log('✅ Transaction Sent:', txHash);
 
-            // LOG STAGE 2: PENDING
-            logPending(transactionId, {
-                status: 'pending',
-                chain: 'BSC',
-                expectedAmount: parseFloat(amount),
-                poolType,
-                txHash
-            });
+            // 3. Link TxHash to Intent
+            await poolPaymentService.updateTxHash(intent.id, txHash);
 
-            // Create PendingTransaction AFTER transaction is sent (with tx_hash)
-            try {
-                const { data: pendingTx } = await supabase.from('pending_transactions').insert({
-                    wallet_address: account.toLowerCase(),
-                    tx_hash: txHash,
-                    status: 'pending',
-                    expected_amount: parseFloat(amount),
-                    pool_type: poolType,
-                    pool_address: poolAddress,
-                    duration_months: poolType === 'traditional' ? durationMonths : undefined
-                }).select().single();
-                if (pendingTx) pendingTxId = pendingTx.id;
-                setPendingTxHash(txHash);
-                setVerifying(true);
-
-                // LOG: Transaction hash received
-                logTransactionRound(transactionId, {
-                    roundNumber: 1,
-                    txHash,
-                    blockNumber: null,
-                    confirmations: 0,
-                    currentStatus: 'pending',
-                    expectedAmount: parseFloat(amount)
-                });
-            } catch (error) {
-                console.error('Failed to create pending transaction record:', error);
-            }
-
-            const receipt = await tx.wait();
-
+            // 4. Update UI to Verifying State
+            setPendingTxHash(txHash);
+            setVerifying(true);
             setPaymentModal({
                 isOpen: true,
                 type: 'processing',
-                message: 'Transaction sent! Verifying on blockchain (this may take 1-2 minutes)...'
+                message: 'Transaction sent! Verifying on blockchain...'
             });
 
-            // Start verification immediately
-            await verifyPendingTransaction(txHash);
+            setAmount(''); // Clear input
 
-            setAmount('');
         } catch (error) {
             console.error('Deposit error:', error);
 
-            // Check if user rejected the transaction
-            const isUserRejection = error?.code === 4001 ||
-                error?.code === 'ACTION_REJECTED' ||
-                error?.message?.includes('user rejected') ||
-                error?.message?.includes('User denied');
-
-            logFailure(transactionId, {
-                txHash: pendingTxHash || null,
-                failureReason: isUserRejection
-                    ? 'User rejected the transaction'
-                    : error?.message || 'Deposit transaction failed',
-                status: 'failed',
-                poolType,
-                attemptedRounds: confirmations
-            });
+            const isUserRejection = error?.code === 4001 || error?.message?.includes('user rejected');
 
             setPaymentModal({
                 isOpen: true,
                 type: 'error',
                 message: isUserRejection
-                    ? 'Payment cancelled by user. No funds were transferred.'
-                    : error?.data?.message || error?.message || 'Deposit transaction failed. Please try again.'
+                    ? 'Payment cancelled by user.'
+                    : (error?.data?.message || error?.message || 'Deposit failed. Please try again.')
             });
         } finally {
             setIsDepositing(false);
@@ -730,12 +647,11 @@ export default function DepositForm({ poolAddress, poolType, depositsLocked, onD
                         <p className="text-sm text-blue-400 font-semibold">Verifying Transaction...</p>
                     </div>
                     <p className="text-xs text-gray-400">
-                        Confirmations: {confirmations}/12
+                        Confirmations: {confirmations}/{targetConfirmations}
                     </p>
                     <p className="text-xs text-gray-500 mt-2">
                         TX: {pendingTxHash.slice(0, 10)}...{pendingTxHash.slice(-8)}
                     </p>
-                    {/* Button removed - manual verification can cause race conditions */}
                 </div>
             )}
 
