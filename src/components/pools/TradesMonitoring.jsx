@@ -1,17 +1,16 @@
 import React, { useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { 
+import {
     PieChart, Pie, Cell, BarChart, Bar, LineChart, Line, AreaChart, Area,
-    XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer 
+    XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from 'recharts';
 import { PieChartIcon, BarChart3, TrendingUp, Zap, Activity, Percent } from 'lucide-react';
 import FullscreenChart from '../charts/FullscreenChart';
 
 export default function TradesMonitoring({ trades = [], investors = [], profitShareRate = 0 }) {
-    // Filter trades from December 28th, 2025 onwards
     const filteredTrades = useMemo(() => {
-        const decemberStart = new Date('2025-12-28');
-        return trades.filter(trade => new Date(trade.date) >= decemberStart);
+        // Show all trades to provide full historical visibility
+        return trades;
     }, [trades]);
 
     // Helper to generate date range from December 28th, 2025
@@ -28,11 +27,13 @@ export default function TradesMonitoring({ trades = [], investors = [], profitSh
     // 1. Margin Utilization Over Time
     const marginData = useMemo(() => {
         if (filteredTrades.length === 0) return [];
-        
-        const decStart = new Date('2025-12-28');
-        const latestDate = new Date(Math.max(...filteredTrades.map(t => new Date(t.date))));
-        const dateRange = generateDateRange(decStart, latestDate);
-        
+
+        const startDate = filteredTrades.length > 0
+            ? new Date(Math.min(...filteredTrades.map(t => new Date(t.date).getTime())))
+            : new Date();
+        const latestDate = new Date(Math.max(...filteredTrades.map(t => new Date(t.date).getTime())));
+        const dateRange = generateDateRange(startDate, latestDate);
+
         const dailyMap = {};
         filteredTrades.forEach(trade => {
             const dateKey = new Date(trade.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
@@ -42,7 +43,7 @@ export default function TradesMonitoring({ trades = [], investors = [], profitSh
             dailyMap[dateKey].totalMargin += trade.margin || 0;
             dailyMap[dateKey].count += 1;
         });
-        
+
         return dateRange.map(date => {
             const dateKey = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
             const dayData = dailyMap[dateKey];
@@ -56,11 +57,9 @@ export default function TradesMonitoring({ trades = [], investors = [], profitSh
     // 2. Monthly Performance Summary
     const monthlyData = useMemo(() => {
         if (filteredTrades.length === 0) return [];
-        
+
         const monthlyMap = {};
-        // Ensure December 2025 exists
-        monthlyMap['Dec 2025'] = { month: 'Dec 2025', grossPnl: 0, fees: 0, netPnl: 0 };
-        
+
         filteredTrades.forEach(trade => {
             const monthKey = new Date(trade.date).toLocaleDateString('en-US', { year: 'numeric', month: 'short' });
             if (!monthlyMap[monthKey]) {
@@ -69,7 +68,7 @@ export default function TradesMonitoring({ trades = [], investors = [], profitSh
             monthlyMap[monthKey].grossPnl += trade.pnl || 0;
             monthlyMap[monthKey].fees += trade.fee || 0;
         });
-        
+
         return Object.values(monthlyMap).map(m => {
             const profitAfterFees = m.grossPnl - m.fees;
             const profitShare = profitAfterFees > 0 ? profitAfterFees * profitShareRate : 0;
@@ -90,14 +89,14 @@ export default function TradesMonitoring({ trades = [], investors = [], profitSh
     // 3. Win/Loss Streak Timeline
     const streakData = useMemo(() => {
         if (filteredTrades.length === 0) return [];
-        
-        const sorted = [...filteredTrades].sort((a, b) => new Date(a.date) - new Date(b.date));
-        const decStart = new Date('2025-12-28');
-        const firstTradeDate = new Date(sorted[0].date);
-        
-        // Add zero streak for dates before first trade
+
+        const sorted = [...filteredTrades].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+        const startDate = sorted.length > 0 ? new Date(sorted[0].date) : new Date();
+        const firstTradeDate = new Date(startDate);
+
+        // Add zero streak for start date
         const result = [];
-        const current = new Date(decStart);
+        const current = new Date(startDate);
         while (current < firstTradeDate) {
             result.push({
                 date: current.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
@@ -105,7 +104,7 @@ export default function TradesMonitoring({ trades = [], investors = [], profitSh
             });
             current.setDate(current.getDate() + 1);
         }
-        
+
         let currentStreak = 0;
         sorted.forEach(trade => {
             if (trade.result === 'win') {
@@ -118,18 +117,20 @@ export default function TradesMonitoring({ trades = [], investors = [], profitSh
                 streak: currentStreak
             });
         });
-        
+
         return result;
     }, [filteredTrades]);
 
     // 4. Leverage Usage Over Time
     const leverageData = useMemo(() => {
         if (filteredTrades.length === 0) return [];
-        
-        const decStart = new Date('2025-12-28');
-        const latestDate = new Date(Math.max(...filteredTrades.map(t => new Date(t.date))));
-        const dateRange = generateDateRange(decStart, latestDate);
-        
+
+        const startDate = filteredTrades.length > 0
+            ? new Date(Math.min(...filteredTrades.map(t => new Date(t.date).getTime())))
+            : new Date();
+        const latestDate = new Date(Math.max(...filteredTrades.map(t => new Date(t.date).getTime())));
+        const dateRange = generateDateRange(startDate, latestDate);
+
         const dailyMap = {};
         filteredTrades.forEach(trade => {
             const dateKey = new Date(trade.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
@@ -139,7 +140,7 @@ export default function TradesMonitoring({ trades = [], investors = [], profitSh
             dailyMap[dateKey].totalLeverage += trade.leverage || 0;
             dailyMap[dateKey].count += 1;
         });
-        
+
         return dateRange.map(date => {
             const dateKey = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
             const dayData = dailyMap[dateKey];
@@ -153,17 +154,19 @@ export default function TradesMonitoring({ trades = [], investors = [], profitSh
     // 5. Trade Volume Timeline
     const volumeData = useMemo(() => {
         if (filteredTrades.length === 0) return [];
-        
-        const decStart = new Date('2025-12-28');
-        const latestDate = new Date(Math.max(...filteredTrades.map(t => new Date(t.date))));
-        const dateRange = generateDateRange(decStart, latestDate);
-        
+
+        const startDate = filteredTrades.length > 0
+            ? new Date(Math.min(...filteredTrades.map(t => new Date(t.date).getTime())))
+            : new Date();
+        const latestDate = new Date(Math.max(...filteredTrades.map(t => new Date(t.date).getTime())));
+        const dateRange = generateDateRange(startDate, latestDate);
+
         const dailyMap = {};
         filteredTrades.forEach(trade => {
             const dateKey = new Date(trade.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
             dailyMap[dateKey] = (dailyMap[dateKey] || 0) + 1;
         });
-        
+
         return dateRange.map(date => {
             const dateKey = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
             return {
@@ -176,17 +179,17 @@ export default function TradesMonitoring({ trades = [], investors = [], profitSh
     // 6. ROI Timeline (cumulative)
     const roiData = useMemo(() => {
         if (investors.length === 0 || filteredTrades.length === 0) return [];
-        
+
         const totalDeposits = investors.reduce((sum, inv) => sum + (inv.invested_amount || 0), 0);
         if (totalDeposits === 0) return [];
 
-        const sorted = [...filteredTrades].sort((a, b) => new Date(a.date) - new Date(b.date));
-        const decStart = new Date('2025-12-28');
-        const firstTradeDate = new Date(sorted[0].date);
-        
+        const sorted = [...filteredTrades].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+        const startDate = sorted.length > 0 ? new Date(sorted[0].date) : new Date();
+        const firstTradeDate = new Date(startDate);
+
         const result = [];
-        // Add zero ROI for dates before first trade
-        const current = new Date(decStart);
+        // Add zero ROI for start date
+        const current = new Date(startDate);
         while (current < firstTradeDate) {
             result.push({
                 date: current.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
@@ -194,20 +197,20 @@ export default function TradesMonitoring({ trades = [], investors = [], profitSh
             });
             current.setDate(current.getDate() + 1);
         }
-        
+
         let cumulativePnl = 0;
         sorted.forEach(trade => {
             const profitAfterFees = (trade.pnl || 0) - (trade.fee || 0);
             const profitShare = profitAfterFees > 0 ? profitAfterFees * profitShareRate : 0;
             cumulativePnl += profitAfterFees - profitShare;
-            
+
             const roi = (cumulativePnl / totalDeposits) * 100;
             result.push({
                 date: new Date(trade.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
                 roi: parseFloat(roi.toFixed(2))
             });
         });
-        
+
         return result;
     }, [filteredTrades, investors, profitShareRate]);
 
@@ -244,17 +247,17 @@ export default function TradesMonitoring({ trades = [], investors = [], profitSh
                                 labelStyle={{ color: 'white' }}
                                 formatter={(value) => [`$${value}`, 'Avg Margin']}
                             />
-                            <Area 
-                                type="monotone" 
-                                dataKey="avgMargin" 
-                                stroke="#3b82f6" 
+                            <Area
+                                type="monotone"
+                                dataKey="avgMargin"
+                                stroke="#3b82f6"
                                 fill="url(#marginGradient)"
                                 strokeWidth={2}
                             />
                             <defs>
                                 <linearGradient id="marginGradient" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
-                                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
+                                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
                                 </linearGradient>
                             </defs>
                         </AreaChart>
@@ -300,17 +303,17 @@ export default function TradesMonitoring({ trades = [], investors = [], profitSh
                                 }}
                                 labelStyle={{ color: 'white' }}
                             />
-                            <Area 
-                                type="monotone" 
-                                dataKey="streak" 
-                                stroke="#a855f7" 
+                            <Area
+                                type="monotone"
+                                dataKey="streak"
+                                stroke="#a855f7"
                                 fill="url(#streakGradient)"
                                 strokeWidth={2}
                             />
                             <defs>
                                 <linearGradient id="streakGradient" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="5%" stopColor="#a855f7" stopOpacity={0.3}/>
-                                    <stop offset="95%" stopColor="#a855f7" stopOpacity={0}/>
+                                    <stop offset="5%" stopColor="#a855f7" stopOpacity={0.3} />
+                                    <stop offset="95%" stopColor="#a855f7" stopOpacity={0} />
                                 </linearGradient>
                             </defs>
                         </AreaChart>
@@ -357,17 +360,17 @@ export default function TradesMonitoring({ trades = [], investors = [], profitSh
                                 }}
                                 labelStyle={{ color: 'white' }}
                             />
-                            <Area 
-                                type="monotone" 
-                                dataKey="trades" 
-                                stroke="#06b6d4" 
+                            <Area
+                                type="monotone"
+                                dataKey="trades"
+                                stroke="#06b6d4"
                                 fill="url(#volumeGradient)"
                                 strokeWidth={2}
                             />
                             <defs>
                                 <linearGradient id="volumeGradient" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="5%" stopColor="#06b6d4" stopOpacity={0.3}/>
-                                    <stop offset="95%" stopColor="#06b6d4" stopOpacity={0}/>
+                                    <stop offset="5%" stopColor="#06b6d4" stopOpacity={0.3} />
+                                    <stop offset="95%" stopColor="#06b6d4" stopOpacity={0} />
                                 </linearGradient>
                             </defs>
                         </AreaChart>
@@ -392,10 +395,10 @@ export default function TradesMonitoring({ trades = [], investors = [], profitSh
                                 labelStyle={{ color: 'white' }}
                                 formatter={(value) => [`${value}%`, 'ROI']}
                             />
-                            <Line 
-                                type="monotone" 
-                                dataKey="roi" 
-                                stroke="#ec4899" 
+                            <Line
+                                type="monotone"
+                                dataKey="roi"
+                                stroke="#ec4899"
                                 strokeWidth={2}
                                 dot={false}
                             />

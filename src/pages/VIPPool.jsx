@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabaseClient';
 import { useWallet } from '../components/wallet/WalletContext';
 import { Link } from 'react-router-dom';
@@ -120,47 +120,11 @@ function VIPPool() {
         refetchOnWindowFocus: false
     });
 
-    const investmentMutation = useMutation({
-        mutationFn: async (vars) => {
-            const { amount, txHash } = vars;
-            const walletAddr = cleanWalletAddress(account);
-
-            if (userInvestment) {
-                const { data, error } = await supabase.from('pool_investors').update({
-                    invested_amount: userInvestment.invested_amount + amount,
-                    deposit_transactions: [
-                        ...(userInvestment.deposit_transactions || []),
-                        { amount, date: new Date().toISOString(), tx_hash: txHash }
-                    ]
-                }).eq('id', userInvestment.id).select().single();
-                if (error) throw error;
-                return data;
-            } else {
-                const { data, error } = await supabase.from('pool_investors').insert({
-                    pool_type: POOL_TYPE,
-                    wallet_address: walletAddr,
-                    investor_name: user?.full_name || `User ${walletAddr.slice(0, 6)}`,
-                    invested_amount: amount,
-                    deposit_transactions: [
-                        { amount, date: new Date().toISOString(), tx_hash: txHash }
-                    ]
-                }).select().single();
-                if (error) throw error;
-                return data;
-            }
-        },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['investors'] });
-        }
-    });
-
-    const handleDepositSuccess = async (depositInfo) => {
-        await investmentMutation.mutateAsync({
-            amount: depositInfo.amount,
-            txHash: depositInfo.txHash
-        });
-
-        // Notifications already created in DepositForm
+    const handleDepositSuccess = () => {
+        // The backend (finalizeDeposit RPC) already writes to deposit_transactions.
+        // Just invalidate queries to refetch the updated investor data.
+        queryClient.invalidateQueries({ queryKey: ['investors'] });
+        queryClient.invalidateQueries({ queryKey: ['investors', POOL_TYPE, account] });
     };
 
     const handleWithdrawalSubmit = async (formData) => {

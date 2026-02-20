@@ -71,24 +71,23 @@ export default function MessageInput({ roomId, onSendMessage, disabled, isReadOn
         }
     };
 
-    const handleSend = async () => {
+    const handleSend = () => {
         if (!message.trim() && imageUrls.length === 0 || !roomId) return;
         if (isReadOnly) {
             setError('This channel is read-only. You cannot send messages.');
             return;
         }
 
-        setSending(true);
+        const currentMsg = message;
+        const currentImages = [...imageUrls];
+
+        // Clear input IMMEDIATELY for instant feedback
+        setMessage('');
+        setImageUrls([]);
         setError('');
-        try {
-            await onSendMessage(message, imageUrls);
-            setMessage('');
-            setImageUrls([]);
-        } catch (err) {
-            setError(err.message || 'Failed to send message');
-        } finally {
-            setSending(false);
-        }
+
+        // Fire and forget - optimistic update happens in the handler
+        onSendMessage(currentMsg, currentImages);
     };
 
     const handleKeyDown = (e) => {
@@ -136,7 +135,7 @@ export default function MessageInput({ roomId, onSendMessage, disabled, isReadOn
                     onPaste={handlePaste}
                     placeholder={isReadOnly ? "This channel is read-only" : "Type a message... (Shift+Enter for new line)"}
                     disabled={disabled || uploading || sending || isReadOnly}
-                    rows="3"
+                    rows={3}
                     className="w-full bg-black/60 border border-red-700/40 rounded-xl p-3 text-gray-300 placeholder-gray-600 resize-none focus:outline-none focus:ring-2 focus:ring-red-600 focus:border-red-600/60 backdrop-blur-xl transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
                 />
             </div>

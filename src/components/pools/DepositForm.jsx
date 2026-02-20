@@ -641,16 +641,59 @@ export default function DepositForm({ poolAddress, poolType, depositsLocked, onD
             )}
 
             {verifying && pendingTxHash && (
-                <div className="mb-4 p-4 bg-blue-500/10 border border-blue-500/30 rounded-xl">
-                    <div className="flex items-center gap-3 mb-2">
-                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-400"></div>
-                        <p className="text-sm text-blue-400 font-semibold">Verifying Transaction...</p>
+                <div className="mb-6 p-6 bg-gradient-to-br from-blue-500/10 via-cyan-500/5 to-transparent border border-blue-500/30 rounded-2xl backdrop-blur-sm">
+                    <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-3">
+                            <div className="relative">
+                                <div className="w-8 h-8 border-2 border-blue-500/20 border-t-blue-500 rounded-full animate-spin" />
+                                <div className="absolute inset-0 flex items-center justify-center">
+                                    <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
+                                </div>
+                            </div>
+                            <div>
+                                <p className="text-white font-bold">Verifying Payment</p>
+                                <p className="text-xs text-blue-400/80">Blockchain Finality check</p>
+                            </div>
+                        </div>
+                        <div className="text-right">
+                            <p className="text-xl font-mono font-bold text-white">{confirmations}<span className="text-gray-500 text-sm">/{targetConfirmations}</span></p>
+                            <p className="text-[10px] text-gray-500 uppercase tracking-wider">Confirmations</p>
+                        </div>
                     </div>
-                    <p className="text-xs text-gray-400">
-                        Confirmations: {confirmations}/{targetConfirmations}
-                    </p>
-                    <p className="text-xs text-gray-500 mt-2">
-                        TX: {pendingTxHash.slice(0, 10)}...{pendingTxHash.slice(-8)}
+
+                    <div className="space-y-2 mb-4">
+                        <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
+                            <motion.div
+                                className="h-full bg-gradient-to-r from-blue-500 to-cyan-400"
+                                initial={{ width: 0 }}
+                                animate={{ width: `${Math.min((confirmations / targetConfirmations) * 100, 100)}%` }}
+                                transition={{ type: "spring", bounce: 0, duration: 1 }}
+                            />
+                        </div>
+                    </div>
+
+                    <div className="bg-black/40 rounded-xl p-3 border border-white/5">
+                        <div className="flex items-center justify-between text-[10px] text-gray-400">
+                            <span>TRANSACTION HASH</span>
+                            <a
+                                href={`https://bscscan.com/tx/${pendingTxHash}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-cyan-400 hover:underline flex items-center gap-1"
+                            >
+                                VIEW ON BSCSCAN
+                                <svg className="w-2 h-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                </svg>
+                            </a>
+                        </div>
+                        <p className="text-[10px] text-gray-500 font-mono mt-1 break-all select-all">
+                            {pendingTxHash}
+                        </p>
+                    </div>
+
+                    <p className="text-[10px] text-gray-400 text-center mt-4 italic">
+                        🔒 Your funds are secured on-chain. Finalizing once 6 confirmations are reached.
                     </p>
                 </div>
             )}

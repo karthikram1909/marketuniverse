@@ -1,0 +1,38 @@
+[
+  {
+    "id": "1d863679-7b8b-4e57-9870-76c3d136a34e",
+    "wallet_address": "0x508d61ad3f1559679bfae3942508b4cf7767935a",
+    "email": "karthikramkopparla@gmail.com",
+    "payment_address": "0x508d61ad3f1559679bfae3942508b4cf7767935a",
+    "name_surname": "karthik",
+    "amount": 0.01,
+    "pool_type": "scalping",
+    "status": "paid",
+    "user_balance_at_request": 0.01,
+    "admin_notes": "Payment completed",
+    "paid_date": "2026-02-17T21:03:01.717+00:00",
+    "created_date": "2026-02-17T21:02:40.281535+00:00",
+    "updated_at": "2026-02-17T21:02:40.281535+00:00",
+    "tx_hash": "",
+    "penalty_amount": 0,
+    "net_amount": null
+  },
+  {
+    "id": "7325f8f2-047b-4032-8d0a-7b17827b9095",
+    "wallet_address": "0x508d61ad3f1559679bfae3942508b4cf7767935a",
+    "email": "karthikramkopparla@gmail.com",
+    "payment_address": "0x508d61ad3f1559679bfae3942508b4cf7767935a",
+    "name_surname": "karthik",
+    "amount": 0.01,
+    "pool_type": "scalping",
+    "status": "paid",
+    "user_balance_at_request": 0.01,
+    "admin_notes": "Payment completed",
+    "paid_date": "2026-02-17T21:07:05.107+00:00",
+    "created_date": "2026-02-17T21:06:47.181817+00:00",
+    "updated_at": "2026-02-17T21:06:47.181817+00:00",
+    "tx_hash": "",
+    "penalty_amount": 0,
+    "net_amount": null
+  }
+]

@@ -153,6 +153,26 @@ export default function TraditionalPoolAdmin() {
         refetchInterval: false
     });
 
+    // Fetch all profiles to get usernames
+    const { data: allProfiles = [] } = useQuery({
+        queryKey: ['allProfiles'],
+        queryFn: async () => {
+            const { data } = await supabase.from('profiles').select('id, username, wallet_address');
+            return data || [];
+        },
+        enabled: isAdmin,
+        staleTime: 60000
+    });
+
+    const profilesMap = React.useMemo(() => {
+        const map = new Map();
+        allProfiles.forEach(p => {
+            if (p.id && p.username) map.set(p.id, p.username);
+            if (p.wallet_address && p.username) map.set(p.wallet_address.toLowerCase(), p.username);
+        });
+        return map;
+    }, [allProfiles]);
+
     useEffect(() => {
         if (poolSettings) {
             setPoolSettingsForm({
@@ -743,7 +763,9 @@ export default function TraditionalPoolAdmin() {
                                             const investor = allInvestors.find(inv => inv.wallet_address.toLowerCase() === wallet);
                                             return (
                                                 <tr key={wallet} className="border-b border-white/5 hover:bg-white/5">
-                                                    <td className="p-3 text-white">{investor?.investor_name || 'Unknown'}</td>
+                                                    <td className="p-3 text-white">
+                                                        {profilesMap.get(investor.id) || profilesMap.get(investor.wallet_address?.toLowerCase()) || investor.investor_name || 'Unknown'}
+                                                    </td>
                                                     <td className="p-3 text-gray-400 font-mono text-xs">{wallet.slice(0, 6)}...{wallet.slice(-4)}</td>
                                                     <td className="p-3 text-right text-white font-bold">${data.totalBalance.toFixed(2)}</td>
                                                     <td className="p-3 text-right text-cyan-400">{data.ownershipPercent.toFixed(2)}%</td>
@@ -814,13 +836,16 @@ export default function TraditionalPoolAdmin() {
                         </div>
                         {(() => {
                             const allDeposits = allInvestors.flatMap(investor =>
-                                (investor.deposit_transactions || []).map((deposit, idx) => ({
-                                    ...deposit,
-                                    investor_name: investor.investor_name,
-                                    wallet_address: investor.wallet_address,
-                                    id: `${investor.id}-${idx}`
-                                }))
-                            ).sort((a, b) => new Date(b.date) - new Date(a.date));
+                                (investor.deposit_transactions || []).map((deposit, idx) => {
+                                    const username = profilesMap.get(investor.id) || profilesMap.get(investor.wallet_address?.toLowerCase());
+                                    return {
+                                        ...deposit,
+                                        investor_name: username || investor.investor_name,
+                                        wallet_address: investor.wallet_address,
+                                        id: `${investor.id}-${idx}`
+                                    };
+                                })
+                            ).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
                             const depositsPerPage = 10;
                             const totalDepositPages = Math.ceil(allDeposits.length / depositsPerPage);
@@ -843,7 +868,9 @@ export default function TraditionalPoolAdmin() {
                                                 <div className="absolute inset-0 bg-gradient-to-br from-green-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl" />
                                                 <div className="relative z-10 flex justify-between items-start">
                                                     <div>
-                                                        <p className="text-white font-bold text-lg mb-1">{deposit.investor_name}</p>
+                                                        <p className="text-white font-bold text-lg mb-1">
+                                                            {deposit.investor_name || `User ${deposit.wallet_address?.slice(0, 6)}`}
+                                                        </p>
                                                         <p className="text-gray-400 text-sm font-mono bg-black/30 px-2 py-1 rounded inline-block">
                                                             {deposit.wallet_address.slice(0, 10)}...{deposit.wallet_address.slice(-8)}
                                                         </p>

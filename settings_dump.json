@@ -1,0 +1,13 @@
+[
+  {
+    "id": "d55a2da0-71b7-4f0e-ae9b-156c060775df",
+    "pool_type": "scalping",
+    "pool_address": "0x508D61ad3f1559679BfAe3942508B4cf7767935A",
+    "profit_share_rate": 0.3,
+    "usdt_contract": null,
+    "deposits_locked": true,
+    "withdrawals_locked": false,
+    "created_at": "2026-02-17T20:52:07.061063+00:00",
+    "updated_at": "2026-02-17T20:52:07.061063+00:00"
+  }
+]

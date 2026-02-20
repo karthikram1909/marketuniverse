@@ -41,7 +41,7 @@ export default function ChatRoom() {
             }), {});
         },
         enabled: !!user?.email,
-        staleTime: 60000, // Refresh every minute
+        staleTime: 5000, // Refresh every 5 seconds if not updated by realtime
         refetchOnWindowFocus: true
     });
     const globalChatUnsubscribeRef = useRef(null);
@@ -142,6 +142,7 @@ export default function ChatRoom() {
     // - Ensure ChatMessageStore and GlobalChatCatchUp are also Supabase-compatible or updated.
 
     // Fetch user and check auth
+    // 1. Initial Auth & Profile Loading
     useEffect(() => {
         const loadUser = async () => {
             try {
@@ -151,10 +152,7 @@ export default function ChatRoom() {
                     return;
                 }
 
-                // Get profile data to attach wallet/role info 
                 const { data: userProfile } = await supabase.from('profiles').select('*').eq('id', currentUser.id).single();
-
-                // Enrich user object with profile data for compatibility
                 const enrichedUser = {
                     ...currentUser,
                     role: userProfile?.role || 'user',
@@ -162,7 +160,6 @@ export default function ChatRoom() {
                 };
                 setUser(enrichedUser);
 
-                // Check if user has chat profile
                 const { data: profiles, error } = await supabase
                     .from('chat_profiles')
                     .select('*')
@@ -173,49 +170,14 @@ export default function ChatRoom() {
                     return;
                 }
 
-                // Profile found - clean up just_created param if present
-                const urlParams = new URLSearchParams(window.location.search);
-                if (urlParams.has('just_created')) {
-                    navigate('/Chat', { replace: true });
-                }
-
                 const profile = profiles[0];
-
-                // HARD GATE: Approval check
-                if (profile.is_blocked === true) {
+                if (profile.is_blocked || profile.is_approved !== true) {
                     navigate('/ChatProfileSetup', { replace: true });
                     return;
                 }
 
-                if (profile.is_approved !== true) {
-                    navigate('/ChatProfileSetup', { replace: true });
-                    return;
-                }
-
-                // APPROVED - set state and proceed
                 setIsApproved(true);
                 setChatProfile(profile);
-
-                // ONLY after approval: Update status to online
-                await supabase.from('chat_profiles').update({
-                    status: 'online',
-                    last_seen: new Date().toISOString()
-                }).eq('id', profile.id);
-
-                setChatProfile(prev => ({ ...prev, status: 'online' }));
-
-                // Heartbeat
-                const heartbeatInterval = setInterval(async () => {
-                    try {
-                        await supabase.from('chat_profiles').update({
-                            last_seen: new Date().toISOString()
-                        }).eq('id', profile.id);
-                    } catch (err) {
-                        console.error('Heartbeat failed:', err);
-                    }
-                }, 30000);
-
-                window.chatHeartbeat = heartbeatInterval;
             } catch (err) {
                 console.error('Auth check failed:', err);
                 navigate('/');
@@ -223,19 +185,42 @@ export default function ChatRoom() {
                 setAuthChecked(true);
             }
         };
-
         loadUser();
+    }, [navigate]);
 
-        return () => {
-            if (window.chatHeartbeat) clearInterval(window.chatHeartbeat);
-            if (chatProfile?.id) {
-                supabase.from('chat_profiles').update({
-                    status: 'offline',
+    // 2. Status & Heartbeat (Depends on Chat Profile)
+    const heartbeatRef = useRef(null);
+    useEffect(() => {
+        if (!isApproved || !chatProfile?.id) return;
+
+        const updateOnlineStatus = async () => {
+            await supabase.from('chat_profiles').update({
+                status: 'online',
+                last_seen: new Date().toISOString()
+            }).eq('id', chatProfile.id);
+        };
+
+        updateOnlineStatus();
+
+        heartbeatRef.current = setInterval(async () => {
+            try {
+                await supabase.from('chat_profiles').update({
                     last_seen: new Date().toISOString()
                 }).eq('id', chatProfile.id);
+            } catch (err) {
+                console.error('Heartbeat failed:', err);
             }
+        }, 30000);
+
+        return () => {
+            if (heartbeatRef.current) clearInterval(heartbeatRef.current);
+            // Set offline on unmount
+            supabase.from('chat_profiles').update({
+                status: 'offline',
+                last_seen: new Date().toISOString()
+            }).eq('id', chatProfile.id);
         };
-    }, [navigate, chatProfile?.id]); // Depend on chatProfile.id for cleanup
+    }, [isApproved, chatProfile?.id]);
 
     // Fetch chat rooms
     const { data: rooms = [] } = useQuery({
@@ -260,7 +245,9 @@ export default function ChatRoom() {
                 queryClient.invalidateQueries({ queryKey: ['chatRooms'] });
             })
             .subscribe();
-        return () => supabase.removeChannel(channel);
+        return () => {
+            supabase.removeChannel(channel);
+        };
     }, [queryClient, chatProfile]);
 
     const liveStreamRoom = useMemo(() => {
@@ -273,6 +260,16 @@ export default function ChatRoom() {
             setSelectedRoomId(rooms[0].id);
         }
     }, [rooms, selectedRoomId]);
+
+    // Unified catch-up logic (focus, visibility change, and mount)
+    // Runs for all rooms to bridge gaps in realtime
+    useGlobalChatCatchUp({
+        isApproved,
+        chatProfile,
+        rooms,
+        messageStore,
+        activeReconciliationLocks: {}
+    });
 
     // Fetch messages (initial load)
     const messagesQuery = useQuery({
@@ -289,7 +286,7 @@ export default function ChatRoom() {
             return data ? data.reverse() : [];
         },
         enabled: isApproved && !!selectedRoomId && !!chatProfile,
-        staleTime: Infinity,
+        staleTime: Infinity, // Trust Realtime and Catch-up logic
     });
 
     useEffect(() => {
@@ -301,21 +298,24 @@ export default function ChatRoom() {
     // Notifications
     // Removed redundant polling of 'chatNotifications' table directly
     // logic is now handled by 'get_user_unread_counts' RPC above
-    // Realtime subscription for Notifications
+    // Realtime subscription for Notifications (Global - does not depend on room)
     useEffect(() => {
         if (!user?.email) return;
         const channel = supabase
-            .channel('public:chat_notifications')
+            .channel(`public:chat_notifications:${user.email}`)
             .on('postgres_changes', {
                 event: 'INSERT',
                 schema: 'public',
                 table: 'chat_notifications',
                 filter: `recipient_email=eq.${user.email.toLowerCase()}`
             }, () => {
-                queryClient.invalidateQueries({ queryKey: ['chatNotifications'] });
+                // IMPORTANT: This triggers unread counts refresh
+                queryClient.invalidateQueries({ queryKey: ['unreadCounts', user.email] });
             })
             .subscribe();
-        return () => supabase.removeChannel(channel);
+        return () => {
+            supabase.removeChannel(channel);
+        };
     }, [queryClient, user?.email]);
 
     // Online members
@@ -347,57 +347,68 @@ export default function ChatRoom() {
         enabled: isApproved && !!chatProfile,
     });
 
-    // NEW: Realtime Global Message Subscription via Supabase
+    // Unified Realtime Message Subscription
+    // Stable across room changes, handles global unread counts and active room updates
+    const { mergeMessages, deleteMessage } = messageStore;
+    const selectedRoomIdRef = useRef(selectedRoomId);
+
     useEffect(() => {
-        if (!chatProfile?.id) return;
+        selectedRoomIdRef.current = selectedRoomId;
+    }, [selectedRoomId]);
+
+    useEffect(() => {
+        if (!user?.email || !chatProfile?.id || !isApproved) return;
+
+        console.log("🔌 Initializing Stable Unified Realtime Listener...");
 
         const channel = supabase
-            .channel('public:chat_messages')
-            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_messages' }, payload => {
+            .channel('public:chat_messages_unified')
+            .on('postgres_changes', {
+                event: 'INSERT',
+                schema: 'public',
+                table: 'chat_messages'
+            }, payload => {
                 const newMessage = payload.new;
-                // Merge into store
-                messageStore.mergeMessages(newMessage.room_id, [newMessage], 'realtime');
+                console.log(`📩 Realtime [INSERT] room:${newMessage.room_id}`, newMessage);
 
-                // Unread handling
-                const isActiveRoom = newMessage.room_id === selectedRoomId || (showLiveModal && liveStreamRoom?.id === newMessage.room_id);
-                // Update Unread Counts Query Cache
-                if (!isActiveRoom && user?.email) {
-                    queryClient.setQueryData(['unreadCounts', user.email], (old = {}) => ({
-                        ...old,
-                        [newMessage.room_id]: (old[newMessage.room_id] || 0) + 1
-                    }));
-                }
+                // 1. Global unread update
+                queryClient.invalidateQueries({ queryKey: ['unreadCounts', user.email] });
+
+                // 2. Merge into store (store handles bucketting by room_id)
+                mergeMessages(newMessage.room_id, [newMessage], 'realtime');
             })
-            .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'chat_messages' }, payload => {
-                // We need room_id to delete from store efficiently, but DELETE payloads usually only have ID (unless replica identity full)
-                // Assuming we scan or store has global index. If not, this might be tricky.
-                // Store deleteMessage usually takes room_id. 
-                // Currently suppression might fail if room_id missing in delete payload.
-                // For now, we ignore or try to find it.
-                // Actually, let's just use ID to delete from currently viewed room if applicable.
+            .on('postgres_changes', {
+                event: 'DELETE',
+                schema: 'public',
+                table: 'chat_messages'
+            }, payload => {
+                console.log("🗑️ Realtime [DELETE]", payload.old);
                 if (payload.old && payload.old.id) {
-                    messageStore.deleteMessage(null, payload.old.id); // Updated store to maybe handle null room_id?
-                    // Or iterate all rooms in store?
-                    // Ideally we set REPLICA IDENTITY FULL on chat_messages table to get room_id in delete payload
-                    if (payload.old.room_id) {
-                        messageStore.deleteMessage(payload.old.room_id, payload.old.id);
-                    } else {
-                        // Fallback: try deleting from selectedRoomId
-                        messageStore.deleteMessage(selectedRoomId, payload.old.id);
-                    }
+                    // Use room_id from payload if possible, else fallback to current room
+                    const rid = payload.old.room_id || selectedRoomIdRef.current;
+                    deleteMessage(rid, payload.old.id);
                 }
             })
-            .subscribe();
+            .subscribe((status, err) => {
+                if (err) {
+                    console.error("❌ Realtime Subscription Error:", err);
+                } else {
+                    console.log(`📡 Realtime Status: ${status}`);
+                }
+            });
 
-        return () => supabase.removeChannel(channel);
-    }, [chatProfile?.id, messageStore, selectedRoomId, liveStreamRoom, showLiveModal, user?.email, queryClient]);
+        return () => {
+            console.log("🔌 Tearing down Unified Realtime Listener...");
+            supabase.removeChannel(channel);
+        };
+    }, [user?.email, chatProfile?.id, isApproved, queryClient, mergeMessages, deleteMessage]);
 
     // Send Message
     const sendMessageMutation = useMutation({
-        mutationFn: async ({ content, imageUrls, roomId, clientMessageId }) => {
+        mutationFn: async (vars) => {
+            const { content, imageUrls, roomId, clientMessageId } = vars;
             if (!user?.id) throw new Error('User not loaded');
 
-            // Optimistic update handled in onMutate
             const { data, error } = await supabase.from('chat_messages').insert({
                 room_id: roomId,
                 client_message_id: clientMessageId,
@@ -413,7 +424,8 @@ export default function ChatRoom() {
             if (error) throw error;
             return data;
         },
-        onMutate: async ({ content, imageUrls, roomId, clientMessageId }) => {
+        onMutate: (vars) => {
+            const { content, imageUrls, roomId, clientMessageId } = vars;
             const optimisticMessage = {
                 id: null,
                 client_message_id: clientMessageId,
@@ -446,7 +458,8 @@ export default function ChatRoom() {
     });
 
     const reactionMutation = useMutation({
-        mutationFn: async ({ messageId, emoji }) => {
+        mutationFn: async (vars) => {
+            const { messageId, emoji } = vars;
             // Fetch current reactions
             const { data: msg } = await supabase.from('chat_messages').select('reaction_emojis').eq('id', messageId).single();
             const reactions = msg.reaction_emojis || {};
@@ -703,16 +716,19 @@ export default function ChatRoom() {
                         ...msg,
                         avatar_url: allProfiles.find(p => p.id === msg.sender_profile_id)?.avatar_url
                     }))}
-                    currentUserId={user.id}
+                    currentWallet={user?.wallet_address}
+                    currentUserId={chatProfile.id}
                     canDelete={isAdmin}
                     onDeleteMessage={(msg) => deleteMessageMutation.mutate(msg.id)}
                     onAddReaction={(msgId, emoji) => reactionMutation.mutate({ messageId: msgId, emoji })}
+                    onRetryMessage={(msg) => sendMessageMutation.mutate(msg)}
                 />
 
                 <div className="p-4 border-t border-red-700/30 bg-black">
                     <MessageInput
                         roomId={selectedRoomId}
                         disabled={isReadOnly || sendMessageMutation.isPending}
+                        isReadOnly={isReadOnly}
                         onSendMessage={(msg, imgs) => {
                             sendMessageMutation.mutate({
                                 content: msg,

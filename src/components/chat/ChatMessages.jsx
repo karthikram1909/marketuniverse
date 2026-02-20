@@ -6,6 +6,7 @@ import EmojiPicker from './EmojiPicker';
 import FailedMessageRetry from './FailedMessageRetry';
 
 export default function ChatMessages({ messages, currentWallet, currentUserId, canDelete, onDeleteMessage, onAddReaction, failedMessages = [], onRetryMessage }) {
+    console.log(`💬 ChatMessages RENDER: Received ${messages?.length} messages`);
     const [reactionPickerId, setReactionPickerId] = useState(null);
     const [retrySending, setRetrySending] = useState(null);
     const [showScrollButton, setShowScrollButton] = useState(false);

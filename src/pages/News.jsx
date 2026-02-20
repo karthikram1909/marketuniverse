@@ -5,8 +5,8 @@ import { motion } from 'framer-motion';
 import { Newspaper, ExternalLink, TrendingUp, Calendar, Loader2, AlertCircle } from 'lucide-react';
 import Navbar from '../components/landing/Navbar';
 import Footer from '../components/landing/Footer';
-import NewsTape from '../components/news/NewsTape';
 import NewsFilter from '../components/news/NewsFilter';
+import FinnhubNewsTicker from '../components/news/FinnhubNewsTicker';
 
 export default function News() {
     const [selectedCategory, setSelectedCategory] = useState('all');
@@ -38,7 +38,7 @@ export default function News() {
     return (
         <div className="min-h-screen bg-black">
             <Navbar />
-            <NewsTape />
+            <FinnhubNewsTicker />
 
             {/* Animated Background */}
             <motion.div

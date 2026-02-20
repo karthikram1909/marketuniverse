@@ -4,9 +4,9 @@ import { createPageUrl } from '@/utils';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
-import { 
-    TrendingUp, Users, UserPlus, Wallet, Globe, Clock, 
-    BarChart3, ArrowLeft, Menu, X, Shield, Trash2 
+import {
+    TrendingUp, Users, UserPlus, Wallet, Globe, Clock,
+    BarChart3, ArrowLeft, Menu, X, Shield, Trash2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import TrafficMap from '../components/analytics/TrafficMap';
@@ -16,6 +16,14 @@ import ConfirmResetModal from '../components/admin/ConfirmResetModal';
 export default function TrafficAnalytics() {
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [resetModal, setResetModal] = useState(false);
+    const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 1024);
+
+    React.useEffect(() => {
+        const handleResize = () => setIsDesktop(window.innerWidth >= 1024);
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
+
     const queryClient = useQueryClient();
 
     // Fetch analytics data
@@ -110,7 +118,7 @@ export default function TrafficAnalytics() {
     });
 
     return (
-        <div className="min-h-screen bg-[#0a0f1a] flex">
+        <div className="min-h-screen bg-[#0a0f1a] flex relative overflow-hidden">
             {/* Mobile Menu Button */}
             <button
                 onClick={() => setSidebarOpen(!sidebarOpen)}
@@ -120,20 +128,20 @@ export default function TrafficAnalytics() {
             </button>
 
             {/* Sidebar */}
-            <AnimatePresence>
-                {(sidebarOpen || window.innerWidth >= 1024) && (
+            <AnimatePresence mode="wait">
+                {(sidebarOpen || isDesktop) && (
                     <motion.aside
-                        initial={{ x: -280 }}
+                        initial={isDesktop ? false : { x: -280 }}
                         animate={{ x: 0 }}
                         exit={{ x: -280 }}
-                        className="fixed lg:sticky top-0 left-0 h-screen w-64 bg-[#0f1420] border-r border-white/10 p-6 z-40 flex flex-col"
+                        className="fixed top-0 left-0 h-screen w-64 bg-[#0f1420] border-r border-white/10 p-6 z-40 flex flex-col"
                     >
                         <Link to={createPageUrl('Home')} className="mb-10 block">
                             <Logo size="default" showText={true} />
                         </Link>
 
                         <nav className="flex-1 space-y-2">
-                            <Link 
+                            <Link
                                 to={createPageUrl('GeneralAdmin')}
                                 className="flex items-center gap-3 px-4 py-3 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white transition-colors"
                             >
@@ -163,14 +171,14 @@ export default function TrafficAnalytics() {
 
             {/* Overlay */}
             {sidebarOpen && (
-                <div 
+                <div
                     className="fixed inset-0 bg-black/50 z-30 lg:hidden"
                     onClick={() => setSidebarOpen(false)}
                 />
             )}
 
             {/* Main Content */}
-            <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-auto">
+            <main className={`flex-1 p-4 sm:p-6 lg:p-8 overflow-auto transition-all duration-300 ${isDesktop ? 'ml-64' : ''}`}>
                 <div className="max-w-7xl mx-auto">
                     {/* Header */}
                     <div className="mb-8 pt-12 lg:pt-0 flex items-center justify-between">

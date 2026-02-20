@@ -1,5 +1,6 @@
 
 import { supabase } from '@/lib/supabaseClient';
+import { verifyTransaction } from './gameService';
 
 export const poolPaymentService = {
     // 1. Create Payment Intent
@@ -16,7 +17,7 @@ export const poolPaymentService = {
                 expected_from_address: userAddress,
                 expected_to_address: poolAddress,
                 status: 'PENDING',
-                target_confirmations: 2, // 2 confirmations (~6s) for faster UX (BSC block time ~3s)
+                target_confirmations: 6, // Match game logic (6 confirmations for security)
                 metadata: {
                     pool_type: poolType,
                     duration_months: durationMonths,
@@ -45,16 +46,48 @@ export const poolPaymentService = {
         if (error) throw error;
     },
 
-    // 3. Check Status (Polling)
+    // 3. Check Status (Polling with local verification fallback)
     checkPaymentStatus: async (intentId) => {
-        const { data, error } = await supabase
+        const { data: intent, error } = await supabase
             .from('payment_intents')
-            .select('status, confirmations, tx_hash, target_confirmations')
+            .select('id, status, confirmations, tx_hash, target_confirmations')
             .eq('id', intentId)
             .single();
 
         if (error) throw error;
-        return data; // returns { status, confirmations, tx_hash }
+
+        // Same logic as game: If PENDING or CONFIRMING and we have a hash, try local verification fallback
+        if ((intent.status === 'PENDING' || intent.status === 'CONFIRMING') && intent.tx_hash) {
+            const check = await verifyTransaction(intent.tx_hash);
+            const target = intent.target_confirmations || 6;
+
+            if (check.verified && check.confirmations >= target) {
+                console.log(`[Pool-Client-Verify] Payment confirmed locally (${check.confirmations} confs). Updating DB...`);
+
+                const { data: updated, error: updateError } = await supabase
+                    .from('payment_intents')
+                    .update({
+                        status: 'CONFIRMED',
+                        updated_at: new Date().toISOString(),
+                        confirmations: check.confirmations
+                    })
+                    .eq('id', intent.id)
+                    .select()
+                    .single();
+
+                if (!updateError && updated) {
+                    return updated;
+                }
+            }
+
+            // Return updated confirmations even if not confirmed yet
+            return {
+                ...intent,
+                confirmations: Math.max(intent.confirmations || 0, check.confirmations || 0)
+            };
+        }
+
+        return intent;
     },
 
     // 3.5 Get Active Intent (Recovery)
@@ -64,7 +97,6 @@ export const poolPaymentService = {
             .from('payment_intents')
             .select('*')
             .eq('user_id', userId)
-            .eq('status', 'PENDING') // Or CONFIRMING. Let's just monitor all active.
             .or('status.eq.PENDING,status.eq.CONFIRMING')
             .contains('metadata', { pool_type: poolType })
             .order('created_at', { ascending: false })

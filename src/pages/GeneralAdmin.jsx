@@ -73,6 +73,13 @@ export default function GeneralAdmin() {
     const [depositsSortField, setDepositsSortField] = useState('date');
     const [depositsSortDirection, setDepositsSortDirection] = useState('desc');
     const [debugModal, setDebugModal] = useState({ isOpen: false, data: null });
+    const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 1024);
+
+    useEffect(() => {
+        const handleResize = () => setIsDesktop(window.innerWidth >= 1024);
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
 
     const { data: allAdmins = [] } = useQuery({
         queryKey: ['allAdmins'],
@@ -521,11 +528,29 @@ export default function GeneralAdmin() {
     // Add admin mutation
     const addAdminMutation = useMutation({
         mutationFn: async (data) => {
-            const { data: result, error } = await supabase
-                .from('profiles')
-                .update({ role: 'admin' })
-                .eq('email', data.email);
+            const updateData = { role: 'admin' };
+            if (data.name) {
+                updateData.full_name = data.name;
+            }
+
+            const query = supabase.from('profiles').update(updateData);
+
+            if (data.email) {
+                query.eq('email', data.email);
+            } else if (data.wallet_address) {
+                query.eq('wallet_address', data.wallet_address);
+            } else {
+                throw new Error('Email or wallet address required');
+            }
+
+            const { data: result, error } = await query.select();
             if (error) throw error;
+
+            // If no rows were updated, it means the user doesn't exist
+            if (!result || result.length === 0) {
+                throw new Error('User not found. They must sign up first.');
+            }
+
             return result;
         },
         onSuccess: () => {
@@ -533,6 +558,10 @@ export default function GeneralAdmin() {
             setNewAdminEmail('');
             setNewAdminWallet('');
             setNewAdminName('');
+            toast.success('Admin added successfully');
+        },
+        onError: (error) => {
+            toast.error(error.message || 'Failed to add admin');
         }
     });
 
@@ -1032,13 +1061,13 @@ export default function GeneralAdmin() {
             </motion.button>
 
             {/* Sidebar */}
-            <AnimatePresence>
-                {(sidebarOpen || window.innerWidth >= 1024) && (
+            <AnimatePresence mode="wait">
+                {(sidebarOpen || isDesktop) && (
                     <motion.aside
-                        initial={{ x: -280 }}
+                        initial={isDesktop ? false : { x: -280 }}
                         animate={{ x: 0 }}
                         exit={{ x: -280 }}
-                        className="fixed lg:sticky top-0 left-0 h-screen w-64 bg-black/40 backdrop-blur-xl border-r border-red-500/30 p-6 z-40 flex flex-col"
+                        className="fixed top-0 left-0 h-screen w-64 bg-black/40 backdrop-blur-xl border-r border-red-500/30 p-6 z-40 flex flex-col"
                         style={{
                             boxShadow: '0 8px 32px 0 rgba(220, 38, 38, 0.2)'
                         }}
@@ -1313,7 +1342,7 @@ export default function GeneralAdmin() {
             )}
 
             {/* Main Content */}
-            <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-auto relative z-10">
+            <main className={`flex-1 p-4 sm:p-6 lg:p-8 overflow-auto relative z-10 transition-all duration-300 ${isDesktop ? 'ml-64' : ''}`}>
                 <div className="max-w-7xl mx-auto">
                     {activeSection === 'backup' && (
                         <>
@@ -3356,7 +3385,7 @@ export default function GeneralAdmin() {
                                             {allAdmins.map((admin) => (
                                                 <tr key={admin.id} className="border-b border-white/5 hover:bg-white/5">
                                                     <td className="py-3 px-4 text-white font-medium">
-                                                        {admin.name || 'N/A'}
+                                                        {admin.full_name || 'N/A'}
                                                     </td>
                                                     <td className="py-3 px-4 text-gray-300">
                                                         {admin.email || 'N/A'}

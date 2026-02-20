@@ -123,9 +123,10 @@ function TraditionalPool() {
 
     const handleDepositSuccess = () => {
         // Refresh data after successful deposit
+        // Invalidate ALL investor queries (both list and user-specific)
         queryClient.invalidateQueries({ queryKey: ['investors'] });
+        queryClient.invalidateQueries({ queryKey: ['investors', POOL_TYPE, account] });
         queryClient.invalidateQueries({ queryKey: ['withdrawals'] });
-        // Optional: Add toast notification here if not handled by DepositForm
     };
 
     const handleWithdrawalSubmit = async (formData) => {
@@ -811,6 +812,7 @@ function TraditionalPool() {
                             poolType={POOL_TYPE}
                             depositsLocked={poolSettings?.deposits_locked || false}
                             onDepositSuccess={handleDepositSuccess}
+                            userInvestment={userInvestment}
                         />
                     ) : poolSettings ? (
                         <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-6 text-center">

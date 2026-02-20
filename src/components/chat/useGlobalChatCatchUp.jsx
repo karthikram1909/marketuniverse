@@ -16,6 +16,9 @@ export function useGlobalChatCatchUp({ isApproved, chatProfile, rooms, messageSt
     const skippedByLockCount = useRef(0);
     const skippedByDebounceCount = useRef(0);
 
+    // Use stable references for the loop
+    const { mergeMessages, getLastServerCursor } = messageStore;
+
     useEffect(() => {
         const handleGlobalCatchUp = async () => {
             if (!isApproved || !chatProfile || !rooms || rooms.length === 0) return;
@@ -47,7 +50,7 @@ export function useGlobalChatCatchUp({ isApproved, chatProfile, rooms, messageSt
                         continue;
                     }
 
-                    const cursor = messageStore.getLastServerCursor(room.id);
+                    const cursor = getLastServerCursor(room.id);
                     // Skip catch-up if we have no cursor (room not yet loaded or empty)
                     if (!cursor) continue;
 
@@ -64,7 +67,7 @@ export function useGlobalChatCatchUp({ isApproved, chatProfile, rooms, messageSt
                     }
 
                     if (catchUpMessages && catchUpMessages.length > 0) {
-                        messageStore.mergeMessages(room.id, catchUpMessages, 'server');
+                        mergeMessages(room.id, catchUpMessages, 'server');
                     }
                 }
             } catch (err) {
@@ -96,5 +99,5 @@ export function useGlobalChatCatchUp({ isApproved, chatProfile, rooms, messageSt
             window.removeEventListener('focus', handleFocus);
             document.removeEventListener('visibilitychange', handleVisibilityChange);
         };
-    }, [isApproved, chatProfile, rooms, messageStore, activeReconciliationLocks]);
+    }, [isApproved, chatProfile, rooms, mergeMessages, getLastServerCursor, activeReconciliationLocks]);
 }

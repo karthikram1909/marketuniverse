@@ -21,11 +21,12 @@ import { Wallet, Home, Settings, Bell, LogOut, Menu, X, Shield, Briefcase, Messa
 import { motion, AnimatePresence } from 'framer-motion';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 function DashboardContent() {
     const navigate = useNavigate();
     const location = useLocation();
+    const queryClient = useQueryClient();
     const { account, connectWallet, disconnectWallet, isConnecting, formatAddress } = useWallet();
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [isDesktop, setIsDesktop] = useState(false);
@@ -121,10 +122,32 @@ function DashboardContent() {
             return data || [];
         },
         enabled: !!account,
-        staleTime: 60000,
+        staleTime: 5000,
         refetchInterval: false,
-        refetchOnWindowFocus: false
+        refetchOnWindowFocus: true
     });
+
+    // Realtime subscription for notifications
+    useEffect(() => {
+        if (!account) return;
+
+        const channel = supabase
+            .channel(`public:notifications:wallet:${account.toLowerCase()}`)
+            .on('postgres_changes', {
+                event: '*',
+                schema: 'public',
+                table: 'notifications',
+                filter: `wallet_address=eq.${account.toLowerCase()}`
+            }, () => {
+                // Invalidate query to refetch latest notifications
+                queryClient.invalidateQueries({ queryKey: ['notifications', account] });
+            })
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, [account]);
 
     // Auto-fill withdrawal wallet address when wallet connects
     useEffect(() => {
@@ -306,13 +329,13 @@ function DashboardContent() {
             </button>
 
             {/* Sidebar */}
-            <AnimatePresence>
+            <AnimatePresence mode="wait">
                 {(sidebarOpen || isDesktop) && (
                     <motion.aside
-                        initial={{ x: -280 }}
+                        initial={isDesktop ? false : { x: -280 }}
                         animate={{ x: 0 }}
                         exit={{ x: -280 }}
-                        className="fixed lg:sticky top-0 left-0 h-screen w-64 bg-black/40 backdrop-blur-xl border-r border-red-500/20 p-6 z-40 flex flex-col"
+                        className="fixed top-0 left-0 h-screen w-64 bg-black/40 backdrop-blur-xl border-r border-red-500/20 p-6 z-40 flex flex-col"
                         style={{
                             boxShadow: '0 8px 32px 0 rgba(220, 38, 38, 0.1)'
                         }}
@@ -575,7 +598,7 @@ function DashboardContent() {
             )}
 
             {/* Main Content */}
-            <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-auto relative z-10">
+            <main className={`flex-1 p-4 sm:p-6 lg:p-8 overflow-auto relative z-10 transition-all duration-300 ${isDesktop ? 'ml-64' : ''}`}>
                 <div className="max-w-7xl mx-auto">
                     {activeView === 'profile' && (
                         <>

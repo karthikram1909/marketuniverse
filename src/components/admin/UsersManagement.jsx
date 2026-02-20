@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
-import { Users, Search, Copy, Check, Eye, Trash2, CheckCircle2, XCircle } from 'lucide-react';
+import { Users, Search, Copy, Check, Eye, Trash2, CheckCircle2, XCircle, Crown } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -341,6 +341,27 @@ export default function UsersManagement({ onDeleteUser }) {
                                     </td>
                                     <td className="py-3 px-2">
                                         <div className="flex gap-2">
+                                            <Button
+                                                size="sm"
+                                                onClick={() => {
+                                                    if (confirm(`Promote ${user.email} to Admin?`)) {
+                                                        const query = supabase.from('profiles').update({ role: 'admin' }).eq('id', user.id);
+                                                        query.then(({ error }) => {
+                                                            if (error) {
+                                                                toast.error('Failed to promote user: ' + error.message);
+                                                            } else {
+                                                                toast.success('User promoted to Admin');
+                                                                queryClient.invalidateQueries({ queryKey: ['allUsers'] });
+                                                                queryClient.invalidateQueries({ queryKey: ['allAdmins'] });
+                                                            }
+                                                        });
+                                                    }
+                                                }}
+                                                className="bg-[#f5c96a]/20 hover:bg-[#f5c96a]/30 text-[#f5c96a] border border-[#f5c96a]/50 h-7 w-7 p-0"
+                                                title="Make Admin"
+                                            >
+                                                <Crown className="w-3 h-3" />
+                                            </Button>
                                             <Button
                                                 size="sm"
                                                 onClick={() => setViewModal({ isOpen: true, user })}

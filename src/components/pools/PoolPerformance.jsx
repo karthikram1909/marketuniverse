@@ -5,17 +5,16 @@ import { TrendingUp, DollarSign, Receipt, Award, Target, CheckCircle2, XCircle }
 import { calculatePoolMetrics } from './TimeBasedCalculations';
 import TradesMonitoring from './TradesMonitoring';
 
-export default function PoolPerformance({ 
-    trades = [], 
-    investors = [], 
-    withdrawals = [], 
+export default function PoolPerformance({
+    trades = [],
+    investors = [],
+    withdrawals = [],
     profitShareRate = 0,
     poolType = 'scalping'
 }) {
-    // Filter trades from December 28th, 2025 onwards
     const filteredTrades = useMemo(() => {
-        const decemberStart = new Date('2025-12-28');
-        return trades.filter(trade => new Date(trade.date) >= decemberStart);
+        // Show all trades regardless of date
+        return trades;
     }, [trades]);
 
     const metrics = useMemo(() => {
@@ -44,7 +43,7 @@ export default function PoolPerformance({
 
     // Generate chart data - cumulative over time
     const chartData = useMemo(() => {
-        const sortedTrades = [...filteredTrades].sort((a, b) => 
+        const sortedTrades = [...filteredTrades].sort((a, b) =>
             new Date(a.date) - new Date(b.date)
         );
 
@@ -56,13 +55,13 @@ export default function PoolPerformance({
         return sortedTrades.map((trade, idx) => {
             cumulativeGrossPnl += trade.pnl || 0;
             cumulativeFees += trade.fee || 0;
-            
+
             const profitAfterFees = cumulativeGrossPnl - cumulativeFees;
             // Calculate profit share on profit after fees
-            cumulativeProfitShare = profitAfterFees > 0 
-                ? profitAfterFees * profitShareRate 
+            cumulativeProfitShare = profitAfterFees > 0
+                ? profitAfterFees * profitShareRate
                 : 0;
-            
+
             cumulativeNetPnl = profitAfterFees - cumulativeProfitShare;
 
             return {
@@ -79,15 +78,15 @@ export default function PoolPerformance({
     const dailyData = useMemo(() => {
         if (!filteredTrades || filteredTrades.length === 0) return [];
 
-        const sortedTrades = [...filteredTrades].sort((a, b) => 
+        const sortedTrades = [...filteredTrades].sort((a, b) =>
             new Date(a.date) - new Date(b.date)
         );
 
         const dailyMap = {};
-        
+
         sortedTrades.forEach(trade => {
             const dateKey = new Date(trade.date).toISOString().split('T')[0];
-            
+
             if (!dailyMap[dateKey]) {
                 dailyMap[dateKey] = {
                     date: dateKey,
@@ -98,7 +97,7 @@ export default function PoolPerformance({
                     trades: 0
                 };
             }
-            
+
             const day = dailyMap[dateKey];
             day.grossPnl += trade.pnl || 0;
             day.fees += trade.fee || 0;
@@ -109,7 +108,7 @@ export default function PoolPerformance({
             const profitAfterFees = day.grossPnl - day.fees;
             day.profitShare = profitAfterFees > 0 ? profitAfterFees * profitShareRate : 0;
             day.netPnl = profitAfterFees - day.profitShare;
-            
+
             return {
                 date: new Date(day.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
                 grossPnl: parseFloat(day.grossPnl.toFixed(2)),
@@ -136,9 +135,8 @@ export default function PoolPerformance({
                     </div>
                     <span className="text-gray-300 text-sm font-medium">{label}</span>
                 </div>
-                <p className={`text-3xl font-bold ${
-                    value >= 0 ? 'text-green-400' : 'text-red-400'
-                }`}>
+                <p className={`text-3xl font-bold ${value >= 0 ? 'text-green-400' : 'text-red-400'
+                    }`}>
                     ${Math.abs(value).toFixed(2)}
                 </p>
             </div>
@@ -203,57 +201,57 @@ export default function PoolPerformance({
                             </div>
                             <h3 className="text-xl font-bold text-white">Performance Over Time</h3>
                         </div>
-                    <ResponsiveContainer width="100%" height={400}>
-                        <LineChart data={chartData}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-                            <XAxis 
-                                dataKey="date" 
-                                stroke="rgba(255,255,255,0.5)"
-                                style={{ fontSize: '12px' }}
-                            />
-                            <YAxis 
-                                stroke="rgba(255,255,255,0.5)"
-                                style={{ fontSize: '12px' }}
-                            />
-                            <Tooltip
-                                contentStyle={{
-                                    backgroundColor: 'rgba(15, 23, 42, 0.95)',
-                                    border: '1px solid rgba(255,255,255,0.1)',
-                                    borderRadius: '12px',
-                                    color: 'white'
-                                }}
-                            />
-                            <Legend />
-                            <Line 
-                                type="monotone" 
-                                dataKey="grossPnl" 
-                                stroke="#3b82f6" 
-                                name="Gross PNL"
-                                strokeWidth={2}
-                            />
-                            <Line 
-                                type="monotone" 
-                                dataKey="fees" 
-                                stroke="#ef4444" 
-                                name="Trading Fees"
-                                strokeWidth={2}
-                            />
-                            <Line 
-                                type="monotone" 
-                                dataKey="profitShare" 
-                                stroke="#a855f7" 
-                                name="Profit Share"
-                                strokeWidth={2}
-                            />
-                            <Line 
-                                type="monotone" 
-                                dataKey="netPnl" 
-                                stroke="#22c55e" 
-                                name="Net PNL"
-                                strokeWidth={3}
-                            />
-                        </LineChart>
-                    </ResponsiveContainer>
+                        <ResponsiveContainer width="100%" height={400}>
+                            <LineChart data={chartData}>
+                                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+                                <XAxis
+                                    dataKey="date"
+                                    stroke="rgba(255,255,255,0.5)"
+                                    style={{ fontSize: '12px' }}
+                                />
+                                <YAxis
+                                    stroke="rgba(255,255,255,0.5)"
+                                    style={{ fontSize: '12px' }}
+                                />
+                                <Tooltip
+                                    contentStyle={{
+                                        backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                                        border: '1px solid rgba(255,255,255,0.1)',
+                                        borderRadius: '12px',
+                                        color: 'white'
+                                    }}
+                                />
+                                <Legend />
+                                <Line
+                                    type="monotone"
+                                    dataKey="grossPnl"
+                                    stroke="#3b82f6"
+                                    name="Gross PNL"
+                                    strokeWidth={2}
+                                />
+                                <Line
+                                    type="monotone"
+                                    dataKey="fees"
+                                    stroke="#ef4444"
+                                    name="Trading Fees"
+                                    strokeWidth={2}
+                                />
+                                <Line
+                                    type="monotone"
+                                    dataKey="profitShare"
+                                    stroke="#a855f7"
+                                    name="Profit Share"
+                                    strokeWidth={2}
+                                />
+                                <Line
+                                    type="monotone"
+                                    dataKey="netPnl"
+                                    stroke="#22c55e"
+                                    name="Net PNL"
+                                    strokeWidth={3}
+                                />
+                            </LineChart>
+                        </ResponsiveContainer>
                     </div>
                 </motion.div>
             )}
@@ -278,12 +276,12 @@ export default function PoolPerformance({
                         <ResponsiveContainer width="100%" height={400}>
                             <BarChart data={dailyData}>
                                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-                                <XAxis 
-                                    dataKey="date" 
+                                <XAxis
+                                    dataKey="date"
                                     stroke="rgba(255,255,255,0.5)"
                                     style={{ fontSize: '12px' }}
                                 />
-                                <YAxis 
+                                <YAxis
                                     stroke="rgba(255,255,255,0.5)"
                                     style={{ fontSize: '12px' }}
                                 />
@@ -300,27 +298,27 @@ export default function PoolPerformance({
                                     }}
                                 />
                                 <Legend />
-                                <Bar 
-                                    dataKey="grossPnl" 
-                                    fill="#3b82f6" 
+                                <Bar
+                                    dataKey="grossPnl"
+                                    fill="#3b82f6"
                                     name="Gross PNL"
                                     radius={[8, 8, 0, 0]}
                                 />
-                                <Bar 
-                                    dataKey="fees" 
-                                    fill="#ef4444" 
+                                <Bar
+                                    dataKey="fees"
+                                    fill="#ef4444"
                                     name="Trading Fees"
                                     radius={[8, 8, 0, 0]}
                                 />
-                                <Bar 
-                                    dataKey="profitShare" 
-                                    fill="#a855f7" 
+                                <Bar
+                                    dataKey="profitShare"
+                                    fill="#a855f7"
                                     name="Profit Share"
                                     radius={[8, 8, 0, 0]}
                                 />
-                                <Bar 
-                                    dataKey="netPnl" 
-                                    fill="#22c55e" 
+                                <Bar
+                                    dataKey="netPnl"
+                                    fill="#22c55e"
                                     name="Net PNL"
                                     radius={[8, 8, 0, 0]}
                                 />
@@ -331,10 +329,10 @@ export default function PoolPerformance({
             )}
 
             {/* Trades Monitoring Section */}
-            <TradesMonitoring 
-                trades={trades} 
-                investors={investors} 
-                profitShareRate={profitShareRate} 
+            <TradesMonitoring
+                trades={trades}
+                investors={investors}
+                profitShareRate={profitShareRate}
             />
 
             {/* Additional Info */}
@@ -363,9 +361,8 @@ export default function PoolPerformance({
                         </div>
                         <div className="bg-gradient-to-br from-cyan-500/10 to-blue-600/10 backdrop-blur-sm border border-cyan-500/20 rounded-2xl p-4 hover:shadow-lg hover:shadow-cyan-500/10 transition-all">
                             <span className="text-gray-300 text-sm font-medium block mb-2">Net PNL</span>
-                            <p className={`font-bold text-2xl ${
-                                metrics.netPnl >= 0 ? 'text-cyan-400' : 'text-red-400'
-                            }`}>
+                            <p className={`font-bold text-2xl ${metrics.netPnl >= 0 ? 'text-cyan-400' : 'text-red-400'
+                                }`}>
                                 ${metrics.netPnl.toFixed(2)}
                             </p>
                         </div>

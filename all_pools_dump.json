@@ -1,0 +1,50 @@
+{
+  "trades": [
+    {
+      "pool_type": "traditional",
+      "pnl": 44,
+      "fee": 2,
+      "date": "2026-02-17T20:11:00+00:00"
+    },
+    {
+      "pool_type": "scalping",
+      "pnl": 12,
+      "fee": 800,
+      "date": "2022-01-21T20:32:00+00:00"
+    },
+    {
+      "pool_type": "scalping",
+      "pnl": 0,
+      "fee": 0,
+      "date": "2026-02-17T21:09:18.35+00:00"
+    },
+    {
+      "pool_type": "vip",
+      "pnl": 0,
+      "fee": 0,
+      "date": "2026-02-17T21:09:18.486+00:00"
+    }
+  ],
+  "investors": [
+    {
+      "pool_type": "scalping",
+      "invested_amount": 5000
+    },
+    {
+      "pool_type": "vip",
+      "invested_amount": 10000
+    },
+    {
+      "pool_type": "scalping",
+      "invested_amount": 0
+    },
+    {
+      "pool_type": "traditional",
+      "invested_amount": 0.010008000000000001
+    },
+    {
+      "pool_type": "scalping",
+      "invested_amount": 0.01
+    }
+  ]
+}

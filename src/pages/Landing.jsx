@@ -1,6 +1,6 @@
 import React from 'react';
 import Navbar from '../components/landing/Navbar';
-import NewsTape from '../components/news/NewsTape';
+import FinnhubNewsTicker from '../components/news/FinnhubNewsTicker';
 import HeroSection from '../components/landing/HeroSection';
 import FeaturesSection from '../components/landing/FeaturesSection';
 import StatsSection from '../components/landing/StatsSection';
@@ -15,7 +15,7 @@ export default function Landing() {
     return (
         <div className="min-h-screen bg-[#0a0f1a] overflow-x-hidden">
             <Navbar />
-            <NewsTape />
+            <FinnhubNewsTicker />
             <HeroSection />
             <FeaturesSection />
             <PoolBalancesSection />
