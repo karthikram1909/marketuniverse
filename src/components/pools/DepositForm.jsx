@@ -38,7 +38,7 @@ export default function DepositForm({ poolAddress, poolType, depositsLocked, onD
     const [pendingTxHash, setPendingTxHash] = useState(null);
     const [verifying, setVerifying] = useState(false);
     const [confirmations, setConfirmations] = useState(0);
-    const [targetConfirmations, setTargetConfirmations] = useState(12);
+    const [targetConfirmations, setTargetConfirmations] = useState(2);
     const [usdtContract, setUsdtContract] = useState(null);
     const [user, setUser] = useState(null);
     const [intentId, setIntentId] = useState(null); // Add state for intent tracking

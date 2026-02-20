@@ -16,7 +16,7 @@ export const poolPaymentService = {
                 expected_from_address: userAddress,
                 expected_to_address: poolAddress,
                 status: 'PENDING',
-                target_confirmations: 12, // Required for pool payments
+                target_confirmations: 2, // 2 confirmations (~6s) for faster UX (BSC block time ~3s)
                 metadata: {
                     pool_type: poolType,
                     duration_months: durationMonths,

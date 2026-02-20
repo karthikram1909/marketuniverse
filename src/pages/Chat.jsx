@@ -10,7 +10,7 @@ import MessageInput from '../components/chat/MessageInput';
 import YouTubeLiveEmbed from '../components/chat/YouTubeLiveEmbed';
 import { useChatMessageStore } from '../components/chat/ChatMessageStore';
 import { useGlobalChatCatchUp } from '../components/chat/useGlobalChatCatchUp';
-import { Users, Search, Settings, ChevronDown, Image as ImageIcon, Pin } from 'lucide-react';
+import { Users, Search, Settings, ChevronDown, Image as ImageIcon, Pin, Upload, Loader2, Save } from 'lucide-react';
 
 export default function ChatRoom() {
     const navigate = useNavigate();
@@ -22,12 +22,117 @@ export default function ChatRoom() {
     const [selectedRoomId, setSelectedRoomId] = useState(null);
     const [isApproved, setIsApproved] = useState(false);
     const [showLiveModal, setShowLiveModal] = useState(false);
-    const [inMemoryUnread, setInMemoryUnread] = useState({});
+    // Persistent Unread Counts (Fetched via RPC)
+    const { data: unreadCounts = {} } = useQuery({
+        queryKey: ['unreadCounts', user?.email],
+        queryFn: async () => {
+            if (!user?.email) return {};
+            const { data, error } = await supabase.rpc('get_user_unread_counts', {
+                p_email: user.email
+            });
+            if (error) {
+                console.error('Error fetching unread counts:', error);
+                return {};
+            }
+            // Transform array [{room_id, count}] to object { [room_id]: count }
+            return (data || []).reduce((acc, curr) => ({
+                ...acc,
+                [curr.room_id]: curr.count
+            }), {});
+        },
+        enabled: !!user?.email,
+        staleTime: 60000, // Refresh every minute
+        refetchOnWindowFocus: true
+    });
     const globalChatUnsubscribeRef = useRef(null);
     const catchUpLocksRef = useRef({});
     const catchUpTimersRef = useRef({});
     const notificationRefetchThrottleRef = useRef(0);
     const retryCountRef = useRef({}); // Track retry attempts per clientMessageId
+
+    // Profile Editing State
+    const [showProfileModal, setShowProfileModal] = useState(false);
+    const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+    const [isSavingProfile, setIsSavingProfile] = useState(false);
+    const [editFormData, setEditFormData] = useState({ avatar_url: '', bio: '' });
+    const [avatarPreview, setAvatarPreview] = useState(null);
+
+    const handleOpenProfile = () => {
+        if (chatProfile) {
+            setEditFormData({
+                avatar_url: chatProfile.avatar_url || '',
+                bio: chatProfile.bio || ''
+            });
+            setAvatarPreview(chatProfile.avatar_url || null);
+        }
+        setShowProfileModal(true);
+    };
+
+    const handleAvatarUpload = async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        // Show preview
+        const reader = new FileReader();
+        reader.onload = (e) => setAvatarPreview(e.target?.result);
+        reader.readAsDataURL(file);
+
+        setIsUploadingAvatar(true);
+        try {
+            const fileExt = file.name.split('.').pop();
+            const fileName = `${user.id}-${Math.random()}.${fileExt}`;
+            const filePath = `${fileName}`;
+
+            const { error: uploadError } = await supabase.storage
+                .from('avatars')
+                .upload(filePath, file);
+
+            if (uploadError) throw uploadError;
+
+            const { data: { publicUrl } } = supabase.storage
+                .from('avatars')
+                .getPublicUrl(filePath);
+
+            setEditFormData(prev => ({ ...prev, avatar_url: publicUrl }));
+        } catch (err) {
+            console.error('Avatar upload failed:', err);
+            // Revert preview
+            setAvatarPreview(editFormData.avatar_url || null);
+        } finally {
+            setIsUploadingAvatar(false);
+        }
+    };
+
+    const handleSaveProfile = async () => {
+        if (!user || !chatProfile) return;
+        setIsSavingProfile(true);
+        try {
+            const { error } = await supabase
+                .from('chat_profiles')
+                .update({
+                    avatar_url: editFormData.avatar_url,
+                    bio: editFormData.bio,
+                    updated_at: new Date().toISOString()
+                })
+                .eq('id', chatProfile.id);
+
+            if (error) throw error;
+
+            // Update local state
+            setChatProfile(prev => ({
+                ...prev,
+                avatar_url: editFormData.avatar_url,
+                bio: editFormData.bio
+            }));
+            queryClient.invalidateQueries({ queryKey: ['chatProfilesOnline'] });
+            setShowProfileModal(false);
+        } catch (err) {
+            console.error('Failed to save profile:', err);
+        } finally {
+            setIsSavingProfile(false);
+        }
+    };
+
 
     // Messages come from the store (React tracks messagesByRoom changes)
     const messages = messageStore.messagesByRoom[selectedRoomId] || [];
@@ -194,19 +299,8 @@ export default function ChatRoom() {
     }, [messagesQuery.data, selectedRoomId, messageStore]);
 
     // Notifications
-    const { data: notifications = [] } = useQuery({
-        queryKey: ['chatNotifications', user?.email?.toLowerCase()],
-        queryFn: async () => {
-            if (!user?.email) return [];
-            const { data } = await supabase
-                .from('chat_notifications')
-                .select('*')
-                .eq('recipient_email', user.email.toLowerCase());
-            return data || [];
-        },
-        enabled: isApproved && !!user && !!chatProfile,
-    });
-
+    // Removed redundant polling of 'chatNotifications' table directly
+    // logic is now handled by 'get_user_unread_counts' RPC above
     // Realtime subscription for Notifications
     useEffect(() => {
         if (!user?.email) return;
@@ -266,10 +360,11 @@ export default function ChatRoom() {
 
                 // Unread handling
                 const isActiveRoom = newMessage.room_id === selectedRoomId || (showLiveModal && liveStreamRoom?.id === newMessage.room_id);
-                if (!isActiveRoom) {
-                    setInMemoryUnread(prev => ({
-                        ...prev,
-                        [newMessage.room_id]: (prev[newMessage.room_id] || 0) + 1
+                // Update Unread Counts Query Cache
+                if (!isActiveRoom && user?.email) {
+                    queryClient.setQueryData(['unreadCounts', user.email], (old = {}) => ({
+                        ...old,
+                        [newMessage.room_id]: (old[newMessage.room_id] || 0) + 1
                     }));
                 }
             })
@@ -295,7 +390,7 @@ export default function ChatRoom() {
             .subscribe();
 
         return () => supabase.removeChannel(channel);
-    }, [chatProfile?.id, messageStore, selectedRoomId, liveStreamRoom, showLiveModal]);
+    }, [chatProfile?.id, messageStore, selectedRoomId, liveStreamRoom, showLiveModal, user?.email, queryClient]);
 
     // Send Message
     const sendMessageMutation = useMutation({
@@ -393,17 +488,25 @@ export default function ChatRoom() {
         }
     });
 
-    // Clear unread count when entering a room
+    // Mark room as read when selected
     useEffect(() => {
-        if (selectedRoomId) {
-            setInMemoryUnread(prev => {
-                if (!prev[selectedRoomId]) return prev;
-                const next = { ...prev };
-                delete next[selectedRoomId];
-                return next;
+        if (selectedRoomId && user?.email) {
+            // 1. Optimistic local update
+            queryClient.setQueryData(['unreadCounts', user.email], (old = {}) => {
+                const newState = { ...old };
+                delete newState[selectedRoomId];
+                return newState;
+            });
+
+            // 2. Persistent server update
+            supabase.rpc('mark_room_read', {
+                p_room_id: selectedRoomId,
+                p_email: user.email
+            }).then(({ error }) => {
+                if (error) console.error('Failed to mark room read:', error);
             });
         }
-    }, [selectedRoomId]);
+    }, [selectedRoomId, user?.email, queryClient]);
 
     if (!authChecked) {
         return <div className="min-h-screen flex items-center justify-center bg-black text-gray-500">Loading chat...</div>;
@@ -438,10 +541,10 @@ export default function ChatRoom() {
                                 >
                                     <div className="w-10 h-10 rounded-lg bg-red-900 flex items-center justify-center text-white font-bold relative">
                                         {room.channel_avatar_url ? <img src={room.channel_avatar_url} className="w-full h-full rounded-lg object-cover" /> : '#'}
-                                        {inMemoryUnread[room.id] > 0 && (
-                                            <div className="absolute -top-1 -right-1 bg-red-500 w-5 h-5 rounded-full text-xs flex items-center justify-center border-2 border-black">
-                                                {inMemoryUnread[room.id] > 9 ? '9+' : inMemoryUnread[room.id]}
-                                            </div>
+                                        {(unreadCounts[room.id] > 0) && (
+                                            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
+                                                {unreadCounts[room.id] > 99 ? '99+' : unreadCounts[room.id]}
+                                            </span>
                                         )}
                                     </div>
                                     <div className="overflow-hidden">
@@ -456,16 +559,106 @@ export default function ChatRoom() {
                         <h3 className="text-xs font-semibold text-gray-400 uppercase mb-2 px-2">Online</h3>
                         {allProfiles.map(p => (
                             <div key={p.id} className="flex items-center gap-2 px-3 py-2 text-white">
-                                <div className="w-2 h-2 bg-green-500 rounded-full" />
-                                <span className="text-sm truncate">{p.username}</span>
+                                <div className="relative">
+                                    <div className="w-8 h-8 rounded-full overflow-hidden bg-gray-700">
+                                        {p.avatar_url ? (
+                                            <img src={p.avatar_url} alt={p.username} className="w-full h-full object-cover" />
+                                        ) : (
+                                            <div className="w-full h-full flex items-center justify-center">
+                                                <Users className="w-4 h-4 text-gray-400" />
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-black" />
+                                </div>
+                                <span className="text-sm truncate font-medium">{p.username}</span>
                             </div>
                         ))}
                     </div>
                 </div>
                 <div className="p-4 border-t border-red-700/30">
-                    <Button onClick={() => navigate('/')} className="w-full bg-red-800 hover:bg-red-700">Back Home</Button>
+                    <Button onClick={() => navigate('/')} className="w-full bg-red-800 hover:bg-red-700 mb-2">Back Home</Button>
+                    <Button
+                        onClick={handleOpenProfile}
+                        variant="outline"
+                        className="w-full border-red-700/50 text-red-200 hover:bg-red-900/30 flex items-center justify-center gap-2"
+                    >
+                        <Settings className="w-4 h-4" /> Edit Profile
+                    </Button>
                 </div>
             </div>
+
+            {/* Profile Edit Modal */}
+            <Dialog open={showProfileModal} onOpenChange={setShowProfileModal}>
+                <DialogContent className="bg-gradient-to-br from-slate-900 to-black border-red-800/50 text-white sm:max-w-[425px]">
+                    <DialogHeader>
+                        <DialogTitle className="text-xl font-bold flex items-center gap-2">
+                            Edit Chat Profile
+                        </DialogTitle>
+                    </DialogHeader>
+
+                    <div className="py-4 space-y-6">
+                        {/* Avatar Upload */}
+                        <div className="flex flex-col items-center">
+                            <div className="relative w-24 h-24 mb-4">
+                                <div className="w-full h-full rounded-full overflow-hidden border-2 border-red-500/50 bg-black">
+                                    {avatarPreview ? (
+                                        <img src={avatarPreview} alt="Avatar" className="w-full h-full object-cover" />
+                                    ) : (
+                                        <div className="w-full h-full flex items-center justify-center text-gray-500">
+                                            <Users className="w-10 h-10" />
+                                        </div>
+                                    )}
+                                </div>
+                                <label className="absolute bottom-0 right-0 p-1.5 bg-red-600 hover:bg-red-500 rounded-full cursor-pointer shadow-lg transition-transform hover:scale-110">
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        onChange={handleAvatarUpload}
+                                        disabled={isUploadingAvatar || isSavingProfile}
+                                        className="hidden"
+                                    />
+                                    {isUploadingAvatar ? (
+                                        <Loader2 className="w-4 h-4 text-white animate-spin" />
+                                    ) : (
+                                        <Upload className="w-4 h-4 text-white" />
+                                    )}
+                                </label>
+                            </div>
+                            <p className="text-xs text-gray-400">Click icon to upload new avatar</p>
+                        </div>
+
+                        {/* Bio Input */}
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium text-gray-300">Bio</label>
+                            <textarea
+                                value={editFormData.bio}
+                                onChange={(e) => setEditFormData(prev => ({ ...prev, bio: e.target.value }))}
+                                placeholder="Tell us about yourself..."
+                                className="w-full h-24 bg-white/5 border border-white/10 rounded-lg p-3 text-sm text-white focus:outline-none focus:border-red-500/50 resize-none"
+                                disabled={isSavingProfile}
+                            />
+                        </div>
+
+                        {/* Save Button */}
+                        <Button
+                            onClick={handleSaveProfile}
+                            disabled={isSavingProfile || isUploadingAvatar}
+                            className="w-full bg-gradient-to-r from-red-600 to-red-800 hover:from-red-500 hover:to-red-700 text-white"
+                        >
+                            {isSavingProfile ? (
+                                <>
+                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Saving...
+                                </>
+                            ) : (
+                                <>
+                                    <Save className="w-4 h-4 mr-2" /> Save Changes
+                                </>
+                            )}
+                        </Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
 
             {/* Main Chat */}
             <div className="flex-1 flex flex-col bg-black h-full relative">
