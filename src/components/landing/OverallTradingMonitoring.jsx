@@ -2,13 +2,13 @@ import React, { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { motion } from 'framer-motion';
-import { 
+import {
     BarChart, Bar, LineChart, Line, AreaChart, Area, PieChart, Pie, Cell,
-    XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer 
+    XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from 'recharts';
-import { 
-    TrendingUp, Activity, BarChart3, Zap, Percent, Target, 
-    CheckCircle2, XCircle, DollarSign, Award 
+import {
+    TrendingUp, Activity, BarChart3, Zap, Percent, Target,
+    CheckCircle2, XCircle, DollarSign, Award
 } from 'lucide-react';
 import FullscreenChart from '../charts/FullscreenChart';
 
@@ -89,7 +89,7 @@ export default function OverallTradingMonitoring() {
         return allTrades.filter(trade => new Date(trade.date) >= decemberStart);
     }, [allTrades]);
 
-    const allInvestors = useMemo(() => 
+    const allInvestors = useMemo(() =>
         [...scalpingInvestors, ...traditionalInvestors, ...vipInvestors],
         [scalpingInvestors, traditionalInvestors, vipInvestors]
     );
@@ -100,7 +100,7 @@ export default function OverallTradingMonitoring() {
         const winningTrades = filteredTrades.filter(t => t.result === 'win').length;
         const losingTrades = filteredTrades.filter(t => t.result === 'lose').length;
         const winRate = totalTrades > 0 ? (winningTrades / totalTrades) * 100 : 0;
-        
+
         const grossPnl = filteredTrades.reduce((sum, t) => sum + (t.pnl || 0), 0);
         const tradingFees = filteredTrades.reduce((sum, t) => sum + (t.fee || 0), 0);
         const totalDeposits = allInvestors.reduce((sum, inv) => sum + (inv.invested_amount || 0), 0);
@@ -130,11 +130,11 @@ export default function OverallTradingMonitoring() {
     // 1. Daily Performance
     const dailyData = useMemo(() => {
         if (filteredTrades.length === 0) return [];
-        
+
         const decStart = new Date('2025-12-28');
         const latestDate = new Date(Math.max(...filteredTrades.map(t => new Date(t.date))));
         const dateRange = generateDateRange(decStart, latestDate);
-        
+
         const dailyMap = {};
         filteredTrades.forEach(trade => {
             const dateKey = new Date(trade.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
@@ -143,13 +143,13 @@ export default function OverallTradingMonitoring() {
             }
             const profitAfterFees = (trade.pnl || 0) - (trade.fee || 0);
             const share = profitAfterFees > 0 ? profitAfterFees * (trade.profitShareRate || 0) : 0;
-            
+
             dailyMap[dateKey].grossPnl += trade.pnl || 0;
             dailyMap[dateKey].fees += trade.fee || 0;
             dailyMap[dateKey].profitShare += share;
             dailyMap[dateKey].trades += 1;
         });
-        
+
         return dateRange.map(date => {
             const dateKey = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
             const dayData = dailyMap[dateKey] || { grossPnl: 0, fees: 0, profitShare: 0, trades: 0 };
@@ -166,11 +166,11 @@ export default function OverallTradingMonitoring() {
     // 2. Cumulative Performance Over Time
     const cumulativeData = useMemo(() => {
         if (filteredTrades.length === 0) return [];
-        
+
         const sorted = [...filteredTrades].sort((a, b) => new Date(a.date) - new Date(b.date));
         const decStart = new Date('2025-12-28');
         const firstTradeDate = new Date(sorted[0].date);
-        
+
         const result = [];
         // Add zero values for dates before first trade
         const current = new Date(decStart);
@@ -183,18 +183,18 @@ export default function OverallTradingMonitoring() {
             });
             current.setDate(current.getDate() + 1);
         }
-        
+
         let cumulativeGrossPnl = 0;
         let cumulativeFees = 0;
         let cumulativeProfitShare = 0;
         sorted.forEach(trade => {
             cumulativeGrossPnl += trade.pnl || 0;
             cumulativeFees += trade.fee || 0;
-            
+
             const profitAfterFees = (trade.pnl || 0) - (trade.fee || 0);
             const share = profitAfterFees > 0 ? profitAfterFees * (trade.profitShareRate || 0) : 0;
             cumulativeProfitShare += share;
-            
+
             result.push({
                 date: new Date(trade.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
                 grossPnl: parseFloat(cumulativeGrossPnl.toFixed(2)),
@@ -202,18 +202,18 @@ export default function OverallTradingMonitoring() {
                 netPnl: parseFloat((cumulativeGrossPnl - cumulativeFees - cumulativeProfitShare).toFixed(2))
             });
         });
-        
+
         return result;
     }, [filteredTrades]);
 
     // 3. Margin Utilization
     const marginData = useMemo(() => {
         if (filteredTrades.length === 0) return [];
-        
+
         const decStart = new Date('2025-12-28');
         const latestDate = new Date(Math.max(...filteredTrades.map(t => new Date(t.date))));
         const dateRange = generateDateRange(decStart, latestDate);
-        
+
         const dailyMap = {};
         filteredTrades.forEach(trade => {
             const dateKey = new Date(trade.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
@@ -223,7 +223,7 @@ export default function OverallTradingMonitoring() {
             dailyMap[dateKey].totalMargin += trade.margin || 0;
             dailyMap[dateKey].count += 1;
         });
-        
+
         return dateRange.map(date => {
             const dateKey = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
             const dayData = dailyMap[dateKey];
@@ -237,11 +237,11 @@ export default function OverallTradingMonitoring() {
     // 4. Win/Loss Streak
     const streakData = useMemo(() => {
         if (filteredTrades.length === 0) return [];
-        
+
         const sorted = [...filteredTrades].sort((a, b) => new Date(a.date) - new Date(b.date));
         const decStart = new Date('2025-12-28');
         const firstTradeDate = new Date(sorted[0].date);
-        
+
         const result = [];
         // Add zero streak for dates before first trade
         const current = new Date(decStart);
@@ -252,7 +252,7 @@ export default function OverallTradingMonitoring() {
             });
             current.setDate(current.getDate() + 1);
         }
-        
+
         let currentStreak = 0;
         sorted.forEach(trade => {
             if (trade.result === 'win') {
@@ -265,18 +265,18 @@ export default function OverallTradingMonitoring() {
                 streak: currentStreak
             });
         });
-        
+
         return result;
     }, [filteredTrades]);
 
     // 5. Leverage Usage
     const leverageData = useMemo(() => {
         if (filteredTrades.length === 0) return [];
-        
+
         const decStart = new Date('2025-12-28');
         const latestDate = new Date(Math.max(...filteredTrades.map(t => new Date(t.date))));
         const dateRange = generateDateRange(decStart, latestDate);
-        
+
         const dailyMap = {};
         filteredTrades.forEach(trade => {
             const dateKey = new Date(trade.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
@@ -286,7 +286,7 @@ export default function OverallTradingMonitoring() {
             dailyMap[dateKey].totalLeverage += trade.leverage || 0;
             dailyMap[dateKey].count += 1;
         });
-        
+
         return dateRange.map(date => {
             const dateKey = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
             const dayData = dailyMap[dateKey];
@@ -300,17 +300,17 @@ export default function OverallTradingMonitoring() {
     // 6. Trade Volume
     const volumeData = useMemo(() => {
         if (filteredTrades.length === 0) return [];
-        
+
         const decStart = new Date('2025-12-28');
         const latestDate = new Date(Math.max(...filteredTrades.map(t => new Date(t.date))));
         const dateRange = generateDateRange(decStart, latestDate);
-        
+
         const dailyMap = {};
         filteredTrades.forEach(trade => {
             const dateKey = new Date(trade.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
             dailyMap[dateKey] = (dailyMap[dateKey] || 0) + 1;
         });
-        
+
         return dateRange.map(date => {
             const dateKey = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
             return {
@@ -323,11 +323,11 @@ export default function OverallTradingMonitoring() {
     // 7. ROI Timeline
     const roiData = useMemo(() => {
         if (metrics.totalDeposits === 0 || filteredTrades.length === 0) return [];
-        
+
         const sorted = [...filteredTrades].sort((a, b) => new Date(a.date) - new Date(b.date));
         const decStart = new Date('2025-12-28');
         const firstTradeDate = new Date(sorted[0].date);
-        
+
         const result = [];
         // Add zero ROI for dates before first trade
         const current = new Date(decStart);
@@ -338,45 +338,45 @@ export default function OverallTradingMonitoring() {
             });
             current.setDate(current.getDate() + 1);
         }
-        
+
         let cumulativePnl = 0;
         sorted.forEach(trade => {
             const profitAfterFees = (trade.pnl || 0) - (trade.fee || 0);
             const share = profitAfterFees > 0 ? profitAfterFees * (trade.profitShareRate || 0) : 0;
             cumulativePnl += profitAfterFees - share;
-            
+
             const roi = (cumulativePnl / metrics.totalDeposits) * 100;
             result.push({
                 date: new Date(trade.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
                 roi: parseFloat(roi.toFixed(2))
             });
         });
-        
+
         return result;
     }, [filteredTrades, metrics.totalDeposits]);
 
     // 8. Monthly Performance
     const monthlyData = useMemo(() => {
         if (filteredTrades.length === 0) return [];
-        
+
         const monthlyMap = {};
         // Ensure December 2025 exists
         monthlyMap['Dec 2025'] = { month: 'Dec 2025', grossPnl: 0, fees: 0, profitShare: 0 };
-        
+
         filteredTrades.forEach(trade => {
             const monthKey = new Date(trade.date).toLocaleDateString('en-US', { year: 'numeric', month: 'short' });
             if (!monthlyMap[monthKey]) {
                 monthlyMap[monthKey] = { month: monthKey, grossPnl: 0, fees: 0, profitShare: 0 };
             }
-            
+
             const profitAfterFees = (trade.pnl || 0) - (trade.fee || 0);
             const share = profitAfterFees > 0 ? profitAfterFees * (trade.profitShareRate || 0) : 0;
-            
+
             monthlyMap[monthKey].grossPnl += trade.pnl || 0;
             monthlyMap[monthKey].fees += trade.fee || 0;
             monthlyMap[monthKey].profitShare += share;
         });
-        
+
         return Object.values(monthlyMap).map(m => ({
             ...m,
             netPnl: parseFloat((m.grossPnl - m.fees - m.profitShare).toFixed(2)),
@@ -402,7 +402,7 @@ export default function OverallTradingMonitoring() {
             >
                 <div className="inline-flex items-center gap-3">
                     <div className="h-1 w-16 bg-gradient-to-r from-red-500 via-cyan-500 to-purple-500 rounded-full" />
-                    <motion.h2 
+                    <motion.h2
                         className="text-4xl sm:text-5xl font-bold relative"
                         style={{
                             background: 'linear-gradient(135deg, rgba(239,68,68,0.15) 0%, rgba(6,182,212,0.2) 35%, rgba(168,85,247,0.2) 65%, rgba(239,68,68,0.15) 100%)',
@@ -506,14 +506,14 @@ export default function OverallTradingMonitoring() {
                                 }}
                                 labelStyle={{ color: 'white' }}
                             />
-                            <Line type="monotone" dataKey="grossPnl" stroke="#3b82f6" name="Gross PNL" strokeWidth={2} dot={false} />
+                            <Line type="monotone" dataKey="grossPnl" stroke="#4ade80" name="Gross PNL" strokeWidth={2} dot={false} />
                             <Line type="monotone" dataKey="netPnl" stroke="#22c55e" name="Net PNL" strokeWidth={2} dot={false} />
                         </LineChart>
-                        </ResponsiveContainer>
-                        </FullscreenChart>
+                    </ResponsiveContainer>
+                </FullscreenChart>
 
-                        {/* 2. Daily Performance */}
-                        <FullscreenChart icon={BarChart3} title="Daily Performance">
+                {/* 2. Daily Performance */}
+                <FullscreenChart icon={BarChart3} title="Daily Performance">
                     <ResponsiveContainer width="100%" height={200}>
                         <BarChart data={dailyData}>
                             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
@@ -531,47 +531,47 @@ export default function OverallTradingMonitoring() {
                             />
                             <Bar dataKey="netPnl" fill="#22c55e" radius={[4, 4, 0, 0]} />
                         </BarChart>
-                        </ResponsiveContainer>
-                        </FullscreenChart>
+                    </ResponsiveContainer>
+                </FullscreenChart>
 
-                        {/* 3. Win Rate Pie */}
-                        <FullscreenChart icon={Target} title="Win/Loss Distribution">
+                {/* 3. Win Rate Pie */}
+                <FullscreenChart icon={Target} title="Win/Loss Distribution">
                     <ResponsiveContainer width="100%" height={200}>
-                       <PieChart>
-                           <Pie
-                               data={[
-                                   { name: 'Wins', value: metrics.winningTrades },
-                                   { name: 'Losses', value: metrics.losingTrades }
-                               ]}
-                               cx="50%"
-                               cy="50%"
-                               innerRadius={50}
-                               outerRadius={70}
-                               paddingAngle={5}
-                               dataKey="value"
-                               label={({ percent }) => `${(percent * 100).toFixed(1)}%`}
-                               labelLine={false}
-                           >
-                               <Cell fill="#22c55e" />
-                               <Cell fill="#ef4444" />
-                           </Pie>
-                           <Tooltip
-                               contentStyle={{
-                                   backgroundColor: 'rgba(15, 23, 42, 0.95)',
-                                   border: '1px solid rgba(255,255,255,0.1)',
-                                   borderRadius: '8px',
-                                   fontSize: '12px',
-                                   color: 'white'
-                               }}
-                               itemStyle={{ color: 'white' }}
-                               labelStyle={{ color: 'white' }}
-                           />
-                       </PieChart>
-                       </ResponsiveContainer>
-                       </FullscreenChart>
+                        <PieChart>
+                            <Pie
+                                data={[
+                                    { name: 'Wins', value: metrics.winningTrades },
+                                    { name: 'Losses', value: metrics.losingTrades }
+                                ]}
+                                cx="50%"
+                                cy="50%"
+                                innerRadius={50}
+                                outerRadius={70}
+                                paddingAngle={5}
+                                dataKey="value"
+                                label={({ percent }) => `${(percent * 100).toFixed(1)}%`}
+                                labelLine={false}
+                            >
+                                <Cell fill="#22c55e" />
+                                <Cell fill="#ef4444" />
+                            </Pie>
+                            <Tooltip
+                                contentStyle={{
+                                    backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                                    border: '1px solid rgba(255,255,255,0.1)',
+                                    borderRadius: '8px',
+                                    fontSize: '12px',
+                                    color: 'white'
+                                }}
+                                itemStyle={{ color: 'white' }}
+                                labelStyle={{ color: 'white' }}
+                            />
+                        </PieChart>
+                    </ResponsiveContainer>
+                </FullscreenChart>
 
-                       {/* 4. Margin Utilization */}
-                       <FullscreenChart icon={Activity} title="Margin Utilization">
+                {/* 4. Margin Utilization */}
+                <FullscreenChart icon={Activity} title="Margin Utilization">
                     <ResponsiveContainer width="100%" height={200}>
                         <AreaChart data={marginData}>
                             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
@@ -591,16 +591,16 @@ export default function OverallTradingMonitoring() {
                             <Area type="monotone" dataKey="avgMargin" stroke="#3b82f6" fill="url(#marginGradient)" strokeWidth={2} />
                             <defs>
                                 <linearGradient id="marginGradient" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
-                                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
+                                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
                                 </linearGradient>
                             </defs>
                         </AreaChart>
-                        </ResponsiveContainer>
-                        </FullscreenChart>
+                    </ResponsiveContainer>
+                </FullscreenChart>
 
-                        {/* 5. Win/Loss Streak */}
-                        <FullscreenChart icon={TrendingUp} title="Win/Loss Streak">
+                {/* 5. Win/Loss Streak */}
+                <FullscreenChart icon={TrendingUp} title="Win/Loss Streak">
                     <ResponsiveContainer width="100%" height={200}>
                         <AreaChart data={streakData}>
                             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
@@ -619,16 +619,16 @@ export default function OverallTradingMonitoring() {
                             <Area type="monotone" dataKey="streak" stroke="#a855f7" fill="url(#streakGradient)" strokeWidth={2} />
                             <defs>
                                 <linearGradient id="streakGradient" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="5%" stopColor="#a855f7" stopOpacity={0.3}/>
-                                    <stop offset="95%" stopColor="#a855f7" stopOpacity={0}/>
+                                    <stop offset="5%" stopColor="#a855f7" stopOpacity={0.3} />
+                                    <stop offset="95%" stopColor="#a855f7" stopOpacity={0} />
                                 </linearGradient>
                             </defs>
                         </AreaChart>
-                        </ResponsiveContainer>
-                        </FullscreenChart>
+                    </ResponsiveContainer>
+                </FullscreenChart>
 
-                        {/* 6. Leverage Usage */}
-                        <FullscreenChart icon={Zap} title="Average Leverage">
+                {/* 6. Leverage Usage */}
+                <FullscreenChart icon={Zap} title="Average Leverage">
                     <ResponsiveContainer width="100%" height={200}>
                         <BarChart data={leverageData}>
                             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
@@ -647,11 +647,11 @@ export default function OverallTradingMonitoring() {
                             />
                             <Bar dataKey="avgLeverage" fill="#f59e0b" radius={[4, 4, 0, 0]} />
                         </BarChart>
-                        </ResponsiveContainer>
-                        </FullscreenChart>
+                    </ResponsiveContainer>
+                </FullscreenChart>
 
-                        {/* 7. Trade Volume */}
-                        <FullscreenChart icon={Activity} title="Trade Volume">
+                {/* 7. Trade Volume */}
+                <FullscreenChart icon={Activity} title="Trade Volume">
                     <ResponsiveContainer width="100%" height={200}>
                         <AreaChart data={volumeData}>
                             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
@@ -670,16 +670,16 @@ export default function OverallTradingMonitoring() {
                             <Area type="monotone" dataKey="trades" stroke="#06b6d4" fill="url(#volumeGradient)" strokeWidth={2} />
                             <defs>
                                 <linearGradient id="volumeGradient" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="5%" stopColor="#06b6d4" stopOpacity={0.3}/>
-                                    <stop offset="95%" stopColor="#06b6d4" stopOpacity={0}/>
+                                    <stop offset="5%" stopColor="#06b6d4" stopOpacity={0.3} />
+                                    <stop offset="95%" stopColor="#06b6d4" stopOpacity={0} />
                                 </linearGradient>
                             </defs>
                         </AreaChart>
-                        </ResponsiveContainer>
-                        </FullscreenChart>
+                    </ResponsiveContainer>
+                </FullscreenChart>
 
-                        {/* 8. ROI Timeline */}
-                        <FullscreenChart icon={Percent} title="ROI Over Time">
+                {/* 8. ROI Timeline */}
+                <FullscreenChart icon={Percent} title="ROI Over Time">
                     <ResponsiveContainer width="100%" height={200}>
                         <LineChart data={roiData}>
                             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
@@ -698,11 +698,11 @@ export default function OverallTradingMonitoring() {
                             />
                             <Line type="monotone" dataKey="roi" stroke="#ec4899" strokeWidth={2} dot={false} />
                         </LineChart>
-                        </ResponsiveContainer>
-                        </FullscreenChart>
+                    </ResponsiveContainer>
+                </FullscreenChart>
 
-                        {/* 9. Monthly Performance */}
-                        <FullscreenChart icon={BarChart3} title="Monthly Performance">
+                {/* 9. Monthly Performance */}
+                <FullscreenChart icon={BarChart3} title="Monthly Performance">
                     <ResponsiveContainer width="100%" height={200}>
                         <BarChart data={monthlyData}>
                             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
@@ -721,9 +721,9 @@ export default function OverallTradingMonitoring() {
                             <Legend />
                             <Bar dataKey="netPnl" fill="#22c55e" radius={[4, 4, 0, 0]} name="Net PNL" />
                         </BarChart>
-                        </ResponsiveContainer>
-                        </FullscreenChart>
-                        </div>
-                        </div>
-                        );
-                        }
+                    </ResponsiveContainer>
+                </FullscreenChart>
+            </div>
+        </div>
+    );
+}

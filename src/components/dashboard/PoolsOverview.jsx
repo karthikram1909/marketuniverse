@@ -326,8 +326,8 @@ export default function PoolsOverview() {
                                         </motion.div>
                                         Gross PNL
                                     </span>
-                                    <span className={`font-bold ${stats.grossPnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                                        ${stats.grossPnl.toFixed(2)}
+                                    <span className="font-bold text-green-400">
+                                        ${Math.abs(stats.grossPnl).toFixed(2)}
                                     </span>
                                 </motion.div>
 
@@ -378,8 +378,8 @@ export default function PoolsOverview() {
                                         </motion.div>
                                         Net PNL
                                     </span>
-                                    <span className={`font-bold ${stats.netPnl >= 0 ? 'text-cyan-400' : 'text-red-400'}`}>
-                                        ${stats.netPnl.toFixed(2)}
+                                    <span className="font-bold text-green-400">
+                                        ${Math.abs(stats.netPnl).toFixed(2)}
                                     </span>
                                 </motion.div>
 

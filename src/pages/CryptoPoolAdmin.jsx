@@ -791,8 +791,8 @@ export default function CryptoPoolAdmin() {
                                                     <td className="p-3 text-gray-400 font-mono text-xs">{wallet.slice(0, 6)}...{wallet.slice(-4)}</td>
                                                     <td className="p-3 text-right text-white font-bold">${data.totalBalance.toFixed(2)}</td>
                                                     <td className="p-3 text-right text-cyan-400">{data.ownershipPercent.toFixed(2)}%</td>
-                                                    <td className={`p-3 text-right font-bold ${data.netPnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                                                        ${data.netPnl.toFixed(2)}
+                                                    <td className="p-3 text-right font-bold text-green-400">
+                                                        ${Math.abs(data.netPnl).toFixed(2)}
                                                     </td>
                                                 </tr>
                                             );
@@ -809,8 +809,8 @@ export default function CryptoPoolAdmin() {
                                                 <td className="p-3 text-cyan-400 font-bold" colSpan="2">TOTALS</td>
                                                 <td className="p-3 text-right text-cyan-400 font-bold">${totalBalance.toFixed(2)}</td>
                                                 <td className="p-3 text-right text-cyan-400 font-bold">{totalOwnership.toFixed(2)}%</td>
-                                                <td className={`p-3 text-right font-bold ${totalNetPnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                                                    ${totalNetPnl.toFixed(2)}
+                                                <td className="p-3 text-right font-bold text-green-400">
+                                                    ${Math.abs(totalNetPnl).toFixed(2)}
                                                 </td>
                                             </tr>
                                         ];
@@ -1088,21 +1088,15 @@ export default function CryptoPoolAdmin() {
                                             <td className="p-3 text-right text-white">{trade.leverage}x</td>
                                             <td className="p-3 text-right text-white">${trade.size.toFixed(2)}</td>
                                             <td className="p-3 text-right text-gray-400">${trade.fee.toFixed(2)}</td>
-                                            <td className={`p-3 text-right ${trade.pnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                                                ${trade.pnl.toFixed(2)}
+                                            <td className="p-3 text-right text-green-400">
+                                                ${Math.abs(trade.pnl).toFixed(2)}
                                             </td>
-                                            <td className={`p-3 text-right ${(() => {
-                                                const profitAfterFees = trade.pnl - trade.fee;
-                                                const profitShare = profitAfterFees > 0 ? profitAfterFees * (poolSettings?.profit_share_rate || 0) : 0;
-                                                const netPnl = profitAfterFees - profitShare;
-                                                return netPnl >= 0 ? 'text-green-400' : 'text-red-400';
-                                            })()
-                                                }`}>
+                                            <td className="p-3 text-right text-green-400">
                                                 ${(() => {
                                                     const profitAfterFees = trade.pnl - trade.fee;
                                                     const profitShare = profitAfterFees > 0 ? profitAfterFees * (poolSettings?.profit_share_rate || 0) : 0;
                                                     const netPnl = profitAfterFees - profitShare;
-                                                    return netPnl.toFixed(2);
+                                                    return Math.abs(netPnl).toFixed(2);
                                                 })()}
                                             </td>
                                             <td className="p-3 text-center">

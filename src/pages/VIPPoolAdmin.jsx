@@ -822,8 +822,8 @@ export default function VIPPoolAdmin() {
                                                     <td className="p-3 text-gray-400 font-mono text-xs">{wallet.slice(0, 6)}...{wallet.slice(-4)}</td>
                                                     <td className="p-3 text-right text-white font-bold">${data.totalBalance.toFixed(2)}</td>
                                                     <td className="p-3 text-right text-cyan-400">{data.ownershipPercent.toFixed(2)}%</td>
-                                                    <td className={`p-3 text-right font-bold ${data.netPnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                                                        ${data.netPnl.toFixed(2)}
+                                                    <td className="p-3 text-right font-bold text-green-400">
+                                                        ${Math.abs(data.netPnl).toFixed(2)}
                                                     </td>
                                                 </tr>
                                             );
@@ -840,8 +840,8 @@ export default function VIPPoolAdmin() {
                                                 <td className="p-3 text-purple-400 font-bold" colSpan="2">TOTALS</td>
                                                 <td className="p-3 text-right text-purple-400 font-bold">${totalBalance.toFixed(2)}</td>
                                                 <td className="p-3 text-right text-purple-400 font-bold">{totalOwnership.toFixed(2)}%</td>
-                                                <td className={`p-3 text-right font-bold ${totalNetPnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                                                    ${totalNetPnl.toFixed(2)}
+                                                <td className="p-3 text-right font-bold text-green-400">
+                                                    ${Math.abs(totalNetPnl).toFixed(2)}
                                                 </td>
                                             </tr>
                                         ];
@@ -1119,21 +1119,15 @@ export default function VIPPoolAdmin() {
                                             <td className="p-3 text-right text-white">{trade.leverage}x</td>
                                             <td className="p-3 text-right text-white">${trade.size.toFixed(2)}</td>
                                             <td className="p-3 text-right text-gray-400">${trade.fee.toFixed(2)}</td>
-                                            <td className={`p-3 text-right ${trade.pnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                                                ${trade.pnl.toFixed(2)}
+                                            <td className="p-3 text-right text-green-400">
+                                                ${Math.abs(trade.pnl).toFixed(2)}
                                             </td>
-                                            <td className={`p-3 text-right ${(() => {
-                                                const profitAfterFees = trade.pnl - trade.fee;
-                                                const profitShare = profitAfterFees > 0 ? profitAfterFees * (poolSettings?.profit_share_rate || 0) : 0;
-                                                const netPnl = profitAfterFees - profitShare;
-                                                return netPnl >= 0 ? 'text-green-400' : 'text-red-400';
-                                            })()
-                                                }`}>
+                                            <td className="p-3 text-right text-green-400">
                                                 ${(() => {
                                                     const profitAfterFees = trade.pnl - trade.fee;
                                                     const profitShare = profitAfterFees > 0 ? profitAfterFees * (poolSettings?.profit_share_rate || 0) : 0;
                                                     const netPnl = profitAfterFees - profitShare;
-                                                    return netPnl.toFixed(2);
+                                                    return Math.abs(netPnl).toFixed(2);
                                                 })()}
                                             </td>
                                             <td className="p-3 text-center">
@@ -1519,22 +1513,16 @@ export default function VIPPoolAdmin() {
                                                                 </div>
                                                             </div>
                                                             <div className="text-right space-y-2">
-                                                                <div className={`px-4 py-2 backdrop-blur-sm rounded-xl border ${trade.pnl >= 0
-                                                                    ? 'bg-gradient-to-br from-green-500/20 to-emerald-600/20 border-green-500/30'
-                                                                    : 'bg-gradient-to-br from-red-500/20 to-pink-600/20 border-red-500/30'
-                                                                    }`}>
+                                                                <div className="px-4 py-2 backdrop-blur-sm rounded-xl border bg-gradient-to-br from-green-500/20 to-emerald-600/20 border-green-500/30">
                                                                     <p className="text-gray-400 text-xs mb-1">Gross PNL</p>
-                                                                    <p className={`font-bold text-2xl ${trade.pnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                                                                        ${trade.pnl.toFixed(2)}
+                                                                    <p className="font-bold text-2xl text-green-400">
+                                                                        ${Math.abs(trade.pnl).toFixed(2)}
                                                                     </p>
                                                                 </div>
-                                                                <div className={`px-4 py-2 backdrop-blur-sm rounded-xl border ${netPnl >= 0
-                                                                    ? 'bg-gradient-to-br from-cyan-500/20 to-blue-600/20 border-cyan-500/30'
-                                                                    : 'bg-gradient-to-br from-orange-500/20 to-red-600/20 border-orange-500/30'
-                                                                    }`}>
+                                                                <div className="px-4 py-2 backdrop-blur-sm rounded-xl border bg-gradient-to-br from-green-500/20 to-emerald-600/20 border-green-500/30">
                                                                     <p className="text-gray-400 text-xs mb-1">Net PNL</p>
-                                                                    <p className={`font-bold text-lg ${netPnl >= 0 ? 'text-cyan-400' : 'text-orange-400'}`}>
-                                                                        ${netPnl.toFixed(2)}
+                                                                    <p className="font-bold text-lg text-green-400">
+                                                                        ${Math.abs(netPnl).toFixed(2)}
                                                                     </p>
                                                                 </div>
                                                             </div>

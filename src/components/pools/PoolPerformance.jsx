@@ -120,7 +120,7 @@ export default function PoolPerformance({
         });
     }, [filteredTrades, profitShareRate]);
 
-    const StatCard = ({ icon: Icon, label, value, color, gradient }) => (
+    const StatCard = ({ icon: Icon, label, value, color, gradient, forceColor = null }) => (
         <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -135,7 +135,7 @@ export default function PoolPerformance({
                     </div>
                     <span className="text-gray-300 text-sm font-medium">{label}</span>
                 </div>
-                <p className={`text-3xl font-bold ${value >= 0 ? 'text-green-400' : 'text-red-400'
+                <p className={`text-3xl font-bold ${forceColor || (value >= 0 ? 'text-green-400' : 'text-red-400')
                     }`}>
                     ${Math.abs(value).toFixed(2)}
                 </p>
@@ -151,8 +151,9 @@ export default function PoolPerformance({
                     icon={TrendingUp}
                     label="Gross PNL"
                     value={metrics.grossPnl}
-                    color="bg-blue-500/30 text-blue-400"
-                    gradient="bg-gradient-to-br from-blue-500/10 via-black/20 to-blue-600/5"
+                    color="bg-green-500/30 text-green-400"
+                    forceColor="text-green-400"
+                    gradient="bg-gradient-to-br from-green-500/10 via-black/20 to-green-600/5"
                 />
                 <StatCard
                     icon={Receipt}
@@ -173,6 +174,7 @@ export default function PoolPerformance({
                     label="Net PNL"
                     value={metrics.netPnl}
                     color="bg-green-500/30 text-green-400"
+                    forceColor="text-green-400"
                     gradient="bg-gradient-to-br from-green-500/10 via-black/20 to-green-600/5"
                 />
                 <StatCard
@@ -225,7 +227,7 @@ export default function PoolPerformance({
                                 <Line
                                     type="monotone"
                                     dataKey="grossPnl"
-                                    stroke="#3b82f6"
+                                    stroke="#4ade80"
                                     name="Gross PNL"
                                     strokeWidth={2}
                                 />
@@ -300,7 +302,7 @@ export default function PoolPerformance({
                                 <Legend />
                                 <Bar
                                     dataKey="grossPnl"
-                                    fill="#3b82f6"
+                                    fill="#4ade80"
                                     name="Gross PNL"
                                     radius={[8, 8, 0, 0]}
                                 />
@@ -359,14 +361,14 @@ export default function PoolPerformance({
                             <span className="text-gray-300 text-sm font-medium block mb-2">Total Withdrawals</span>
                             <p className="text-yellow-400 font-bold text-2xl">${metrics.totalWithdrawals.toFixed(2)}</p>
                         </div>
-                        <div className="bg-gradient-to-br from-cyan-500/10 to-blue-600/10 backdrop-blur-sm border border-cyan-500/20 rounded-2xl p-4 hover:shadow-lg hover:shadow-cyan-500/10 transition-all">
+                        <div className="bg-gradient-to-br from-green-500/10 to-emerald-600/10 backdrop-blur-sm border border-green-500/20 rounded-2xl p-4 hover:shadow-lg hover:shadow-green-500/10 transition-all">
                             <span className="text-gray-300 text-sm font-medium block mb-2">Net PNL</span>
-                            <p className={`font-bold text-2xl ${metrics.netPnl >= 0 ? 'text-cyan-400' : 'text-red-400'
-                                }`}>
-                                ${metrics.netPnl.toFixed(2)}
+                            <p className="font-bold text-2xl text-green-400">
+                                ${Math.abs(metrics.netPnl).toFixed(2)}
                             </p>
                         </div>
                     </div>
+
                     <div className="mt-6 pt-6 border-t border-white/10 bg-black/20 rounded-xl p-4">
                         <p className="text-xs text-gray-300 flex items-center gap-2">
                             <span className="w-1.5 h-1.5 bg-cyan-400 rounded-full" />

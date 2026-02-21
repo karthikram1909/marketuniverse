@@ -33,7 +33,7 @@ import BackupRestore from '../components/admin/BackupRestore';
 import DebugWalletModal from '../components/admin/DebugWalletModal';
 import IPTrackingPanel from '../components/admin/IPTrackingPanel';
 import ChatRoomAdmin from '../components/admin/ChatRoomAdmin';
-import { calculateTimeBasedBalances } from '../components/pools/TimeBasedCalculations';
+import { calculateTimeBasedBalances, calculatePoolMetrics } from '../components/pools/TimeBasedCalculations';
 
 import Logo from '../components/common/Logo';
 import { AnimatePresence } from 'framer-motion';
@@ -860,6 +860,15 @@ export default function GeneralAdmin() {
     const getPoolStats = (poolType) => {
         const investors = allInvestors.filter(inv => inv.pool_type === poolType);
         const trades = allTrades.filter(t => t.pool_type === poolType);
+        const withdrawals = allWithdrawals.filter(w => w.pool_type === poolType && w.status === 'paid');
+        const settings = poolSettings.find(s => s.pool_type === poolType);
+
+        const { netPnl } = calculatePoolMetrics({
+            trades,
+            investors,
+            withdrawals,
+            profitShareRate: settings?.profit_share_rate || 0
+        });
 
         const totalInvested = investors.reduce((sum, inv) => sum + (inv.invested_amount || 0), 0);
         const wins = trades.filter(t => t.result === 'win').length;
@@ -869,7 +878,8 @@ export default function GeneralAdmin() {
             investors: investors.length,
             totalInvested,
             trades: trades.length,
-            winRate
+            winRate,
+            netPnl
         };
     };
 
@@ -2224,7 +2234,7 @@ export default function GeneralAdmin() {
                                         const totalNetPnl = (scalpingMetrics.totalPoolValue - (scalpingInvestors.reduce((sum, inv) => sum + inv.invested_amount, 0) - scalpingWithdrawals.reduce((sum, w) => sum + w.amount, 0))) +
                                             (traditionalMetrics.totalPoolValue - (traditionalInvestors.reduce((sum, inv) => sum + inv.invested_amount, 0) - traditionalWithdrawals.reduce((sum, w) => sum + w.amount, 0))) +
                                             (vipMetrics.totalPoolValue - (vipInvestors.reduce((sum, inv) => sum + inv.invested_amount, 0) - vipWithdrawals.reduce((sum, w) => sum + w.amount, 0)));
-                                        return totalNetPnl >= 0 ? 'text-green-400' : 'text-red-400';
+                                        return 'text-green-400';
                                     })()
                                         }`}>
                                         ${(() => {
@@ -2409,7 +2419,11 @@ export default function GeneralAdmin() {
                                                 </div>
                                                 <div className="flex justify-between">
                                                     <span className="text-gray-400">Total Deposited</span>
-                                                    <span className="text-white font-bold">${(pool.stats?.totalInvested || 0).toFixed(2)}</span>
+                                                    <span className="text-[#f5c96a] font-bold">${pool.stats.totalInvested.toFixed(2)}</span>
+                                                </div>
+                                                <div className="flex justify-between font-bold pt-1 border-t border-white/5">
+                                                    <span className="text-gray-300">Net PNL</span>
+                                                    <span className="text-green-400">${Math.abs(pool.stats.netPnl || 0).toFixed(2)}</span>
                                                 </div>
                                                 <div className="flex justify-between">
                                                     <span className="text-gray-400">Current Balance</span>
@@ -2437,11 +2451,11 @@ export default function GeneralAdmin() {
                                                 </div>
                                                 <div className="flex justify-between">
                                                     <span className="text-gray-400">Total Trades</span>
-                                                    <span className="text-white font-bold">{pool.stats?.trades || 0}</span>
+                                                    <span className="text-white font-bold">{pool.stats.trades}</span>
                                                 </div>
                                                 <div className="flex justify-between">
                                                     <span className="text-gray-400">Win Rate</span>
-                                                    <span className="text-green-400 font-bold">{(pool.stats?.winRate || 0).toFixed(2)}%</span>
+                                                    <span className="text-green-400 font-bold">{pool.stats.winRate.toFixed(1)}%</span>
                                                 </div>
                                             </div>
 

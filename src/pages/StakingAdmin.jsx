@@ -679,10 +679,10 @@ export default function StakingAdmin() {
                                             {contract.current_value.toFixed(6)}
                                         </td>
                                         <td className="p-3 text-right text-green-400">
-                                            +{contract.total_earned.toFixed(6)}
+                                            +{Math.abs(contract.total_earned).toFixed(6)}
                                         </td>
                                         <td className="p-3 text-right text-blue-400">
-                                            {contract.status === 'active' ? `+${dailyEarnings.toFixed(6)}` : '-'}
+                                            {contract.status === 'active' ? `+${Math.abs(dailyEarnings).toFixed(6)}` : '-'}
                                         </td>
                                         <td className="p-3 text-center text-white">
                                             {plan?.months}m

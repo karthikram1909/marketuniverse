@@ -769,8 +769,8 @@ export default function TraditionalPoolAdmin() {
                                                     <td className="p-3 text-gray-400 font-mono text-xs">{wallet.slice(0, 6)}...{wallet.slice(-4)}</td>
                                                     <td className="p-3 text-right text-white font-bold">${data.totalBalance.toFixed(2)}</td>
                                                     <td className="p-3 text-right text-cyan-400">{data.ownershipPercent.toFixed(2)}%</td>
-                                                    <td className={`p-3 text-right font-bold ${data.netPnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                                                        ${data.netPnl.toFixed(2)}
+                                                    <td className="p-3 text-right font-bold text-green-400">
+                                                        ${Math.abs(data.netPnl).toFixed(2)}
                                                     </td>
                                                 </tr>
                                             );
@@ -787,8 +787,8 @@ export default function TraditionalPoolAdmin() {
                                                 <td className="p-3 text-yellow-400 font-bold" colSpan="2">TOTALS</td>
                                                 <td className="p-3 text-right text-yellow-400 font-bold">${totalBalance.toFixed(2)}</td>
                                                 <td className="p-3 text-right text-yellow-400 font-bold">{totalOwnership.toFixed(2)}%</td>
-                                                <td className={`p-3 text-right font-bold ${totalNetPnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                                                    ${totalNetPnl.toFixed(2)}
+                                                <td className="p-3 text-right font-bold text-green-400">
+                                                    ${Math.abs(totalNetPnl).toFixed(2)}
                                                 </td>
                                             </tr>
                                         ];
@@ -1069,8 +1069,8 @@ export default function TraditionalPoolAdmin() {
                                                 <td className="py-3 px-4 text-white">{trade.leverage}x</td>
                                                 <td className="py-3 px-4 text-white">${trade.size.toFixed(2)}</td>
                                                 <td className="py-3 px-4 text-red-400">${trade.fee.toFixed(2)}</td>
-                                                <td className={`py-3 px-4 ${trade.pnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                                                    ${trade.pnl.toFixed(2)}
+                                                <td className="py-3 px-4 text-green-400">
+                                                    ${Math.abs(trade.pnl).toFixed(2)}
                                                 </td>
                                                 <td className="py-3 px-4">
                                                     <span className={`px-2 py-1 rounded text-xs ${trade.result === 'win' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
